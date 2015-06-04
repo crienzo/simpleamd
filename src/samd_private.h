@@ -1,5 +1,5 @@
 /* 
- * Copyright (c) 2014 Christopher M. Rienzo <chris@rienzo.com>
+ * Copyright (c) 2014-2015 Christopher M. Rienzo <chris@rienzo.com>
  *
  * See the file COPYING for copying permission.
  */
@@ -8,6 +8,10 @@
 #define SAMD_PRIVATE_H
 
 #include "simpleamd.h"
+
+#define AMD_SAMPLES_PER_MS 8
+#define AMD_SAMPLES_PER_FRAME 80
+#define AMD_MS_PER_FRAME (AMD_SAMPLES_PER_FRAME / AMD_SAMPLES_PER_MS)
 
 /** internal VAD state machine function type */
 typedef void (* samd_vad_state_fn)(samd_vad_t *vad, int in_voice);
@@ -22,41 +26,35 @@ struct samd_vad {
 	/** callback for log messages */
 	samd_log_fn log_handler;
 
-	/** sample rate of input audio */
-	uint32_t sample_rate;
-
-	/** number of channels in input audio */
-	uint32_t num_channels;
-
 	/** energy threshold - values above this are voice slices */
 	uint32_t threshold;
 
-	/** number of samples per slice */
-	uint32_t slice_samples;
+	/** number of consecutive voice frames to trigger transition to voice */
+	uint32_t voice_frames;
 
-	/** number of consecutive voice slices to trigger transition to voice */
-	uint32_t voice_slices;
+	/** number of consecutive silence frames to trigger transition to silence */
+	uint32_t silence_frames;
 
-	/** number of consecutive silence slices to trigger transition to silence */
-	uint32_t silence_slices;
+	/** user data to send to callbacks */
+	void *user_event_data;
 
-	/** user data to send to callback function */
-	void *user_data;
+	/** user data to send to callbacks */
+	void *user_log_data;
 
 	/** current detection state */
 	samd_vad_state_fn state;
 
-	/** energy detected in current slice */
+	/** energy detected in current frame */
 	double energy;
 
-	/** number of samples processed in current slice */
+	/** number of samples processed in current frame */
 	uint32_t samples;
 
 	/** total number of samples processed */
 	uint32_t total_samples;
 
-	/** number of consecutive voice or silence slices processed prior to transitioning state */
-	uint32_t transition_slices;
+	/** number of consecutive voice or silence frames processed prior to transitioning state */
+	uint32_t transition_frames;
 };
 
 /** Internal AMD state machine function type */
@@ -69,17 +67,14 @@ struct samd {
 	/** voice activity detector */
 	samd_vad_t *vad;
 
-	/** number of slices processed */
-	uint32_t slices;
+	/** time running */
+	uint32_t time_ms;
 
-	/** number of samples processed */
-	uint32_t samples;
+	/** maximum frames to wait for voice before giving up */
+	uint32_t silence_start_ms;
 
-	/** maximum slices to wait for voice before giving up */
-	uint32_t silence_start_slices;
-
-	/** number of slices that trigger machine detection */
-	uint32_t machine_slices;
+	/** number of frames that trigger machine detection */
+	uint32_t machine_ms;
 
 	/** callback for AMD events */
 	samd_event_fn event_handler;
@@ -91,10 +86,13 @@ struct samd {
 	samd_state_fn state;
 
 	/** when state was entered */
-	uint32_t state_begin;
+	uint32_t state_begin_ms;
 
 	/** user data to send to callbacks */
-	void *user_data;
+	void *user_event_data;
+
+	/** user data to send to callbacks */
+	void *user_log_data;
 };
 
 /**

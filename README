@@ -1,0 +1,12 @@
+simpleamd : Simple Answering Machine Detector
+
+An answering machine detector that uses a simple energy-based voice activity detector.
+This detector assumes 8000 kHz, mono, PCM samples.
+
+To build:
+
+./autogen.sh
+./configure
+make
+make install
+

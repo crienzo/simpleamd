@@ -1,10 +1,10 @@
 /* 
- * Copyright (c) 2014 Christopher M. Rienzo <chris@rienzo.com>
+ * Copyright (c) 2014-2015 Christopher M. Rienzo <chris@rienzo.com>
  *
  * See the file COPYING for copying permission.
  */
-#include "simpleamd.h"
-#include "samd_private.h"
+#include <simpleamd.h>
+#include <samd_private.h>
 
 #include <stdio.h>
 #include <stdarg.h>
