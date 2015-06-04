@@ -155,42 +155,14 @@ void samd_set_machine_ms(samd_t *amd, uint32_t ms)
  * Process VAD events
  * @param event VAD event
  * @param time_ms time this event occurred, relative to start of detector
- * @param user_data the AMD
+ * @param user_event_data the AMD
  */
-static void vad_event_handler(samd_vad_event_t event, uint32_t time_ms, void *user_data)
+static void vad_event_handler(samd_vad_event_t event, uint32_t time_ms, void *user_event_data)
 {
 	/* forward event to state machine */
-	samd_t *amd = (samd_t *)user_data;
+	samd_t *amd = (samd_t *)user_event_data;
 	amd->time_ms = time_ms;
 	amd->state(amd, event);
-}
-
-/**
- * Create the AMD
- * @param amd
- * @param vad
- */
-void samd_init(samd_t **amd, samd_vad_t *vad)
-{
-	/* reset AMD state */
-	samd_t *new_amd = (samd_t *)malloc(sizeof(*new_amd));
-	new_amd->log_handler = null_log_handler;
-	new_amd->user_log_data = NULL;
-	new_amd->event_handler = null_event_handler;
-	new_amd->user_event_data = NULL;
-	new_amd->state = amd_state_wait_for_voice;
-	new_amd->state_begin = 0;
-	new_amd->time_ms = 0;
-
-	/* set defaults */
-	samd_set_silence_start_ms(new_amd, 200);
-	samd_set_machine_ms(new_amd, 90);
-
-	/* link to VAD */
-	new_amd->vad = vad;
-	samd_vad_set_event_handler(vad, vad_event_handler, new_amd);
-
-	*amd = new_amd;
 }
 
 /**
@@ -212,7 +184,34 @@ void samd_set_log_handler(samd_t *amd, samd_log_fn log_handler, void *user_log_d
 void samd_set_event_handler(samd_t *amd, samd_event_fn event_handler, void *user_event_data)
 {
 	amd->user_event_data = user_event_data;
-	amd->log_handler = log_handler;
+	amd->event_handler = event_handler;
+}
+
+/**
+ * Create the AMD
+ * @param amd
+ * @param vad
+ */
+void samd_init(samd_t **amd, samd_vad_t *vad)
+{
+	samd_t *new_amd = (samd_t *)malloc(sizeof(*new_amd));
+	samd_set_log_handler(new_amd, null_log_handler, NULL);
+	samd_set_event_handler(new_amd, null_event_handler, NULL);
+
+	/* reset AMD state */
+	new_amd->state = amd_state_wait_for_voice;
+	new_amd->state_begin_ms = 0;
+	new_amd->time_ms = 0;
+
+	/* set detection defaults */
+	samd_set_silence_start_ms(new_amd, 200);
+	samd_set_machine_ms(new_amd, 90);
+
+	/* link to VAD */
+	new_amd->vad = vad;
+	samd_vad_set_event_handler(vad, vad_event_handler, new_amd);
+
+	*amd = new_amd;
 }
 
 /**

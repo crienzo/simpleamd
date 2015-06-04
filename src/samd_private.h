@@ -11,7 +11,7 @@
 
 #define AMD_SAMPLES_PER_MS 8
 #define AMD_SAMPLES_PER_FRAME 80
-#define AMD_MS_PER_FRAME (AMD_SAMPLES_PER_FRAME / AMD_SAMPLES_PER_MS)
+#define AMD_MS_PER_FRAME 10
 
 /** internal VAD state machine function type */
 typedef void (* samd_vad_state_fn)(samd_vad_t *vad, int in_voice);
@@ -46,6 +46,9 @@ struct samd_vad {
 
 	/** energy detected in current frame */
 	double energy;
+
+	/** time running */
+	uint32_t time_ms;
 
 	/** number of samples processed in current frame */
 	uint32_t samples;
@@ -98,7 +101,7 @@ struct samd {
 /**
  * Send a log message
  */
-#define samd_log_printf(obj, level, format_string, ...)  _samd_log_printf(obj->log_handler, level, obj->user_data, __FILE__, __LINE__, format_string, __VA_ARGS__)
+#define samd_log_printf(obj, level, format_string, ...)  _samd_log_printf(obj->log_handler, level, obj->user_log_data, __FILE__, __LINE__, format_string, __VA_ARGS__)
 void _samd_log_printf(samd_log_fn log_handler, samd_log_level_t level, void *user_data, const char *file, int line, const char *format_string, ...);
 
 #endif

@@ -17,7 +17,7 @@ typedef enum samd_log_level {
 	SAMD_LOG_ERROR
 } samd_log_level_t;
 
-typedef void (* samd_log_fn)(samd_log_level_t level, void *user_data, const char *file, int line, const char *message);
+typedef void (* samd_log_fn)(samd_log_level_t level, void *user_log_data, const char *file, int line, const char *message);
 
 /* VAD */
 typedef enum samd_vad_event {
@@ -29,7 +29,7 @@ typedef enum samd_vad_event {
 
 typedef struct samd_vad samd_vad_t;
 
-typedef void (* samd_vad_event_fn)(samd_vad_event_t event, uint32_t samples, void *user_data);
+typedef void (* samd_vad_event_fn)(samd_vad_event_t event, uint32_t samples, void *user_event_data);
 
 void samd_vad_init(samd_vad_t **vad);
 void samd_vad_set_log_handler(samd_vad_t *vad, samd_log_fn log_handler, void *user_log_data);
@@ -50,7 +50,7 @@ typedef enum samd_event {
 } samd_event_t;
 
 typedef struct samd samd_t;
-typedef void (* samd_event_fn)(samd_event_t event, uint32_t samples, void *user_data);
+typedef void (* samd_event_fn)(samd_event_t event, uint32_t samples, void *user_event_data);
 
 void samd_init(samd_t **amd, samd_vad_t *vad);
 void samd_set_silence_start_ms(samd_t *amd, uint32_t ms);

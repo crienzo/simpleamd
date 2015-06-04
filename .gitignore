@@ -11,6 +11,7 @@ config.h.in
 config.log
 config.status
 config.sub
+config.cache
 Makefile
 Makefile.in
 *~
@@ -18,3 +19,6 @@ libtool
 ltmain.sh
 .deps
 stamp-h1
+.libs
+*o
+*a
