@@ -204,8 +204,8 @@ void samd_init(samd_t **amd, samd_vad_t *vad)
 	new_amd->time_ms = 0;
 
 	/* set detection defaults */
-	samd_set_silence_start_ms(new_amd, 200);
-	samd_set_machine_ms(new_amd, 90);
+	samd_set_silence_start_ms(new_amd, 2000); /* wait 2 seconds for start of speech */
+	samd_set_machine_ms(new_amd, 900); /* machine if at least 900 ms of voice */
 
 	/* link to VAD */
 	new_amd->vad = vad;
@@ -233,4 +233,16 @@ void samd_destroy(samd_t **amd)
 {
 	free(*amd);
 	*amd = NULL;
+}
+
+const char *samd_event_to_string(samd_event_t event)
+{
+	switch (event) {
+		case SAMD_DEAD_AIR: return "AMD DEAD AIR";
+		case SAMD_MACHINE_VOICE: return "AMD MACHINE VOICE";
+		case SAMD_MACHINE_SILENCE: return "AMD MACHINE SILENCE";
+		case SAMD_HUMAN_VOICE: return "AMD HUMAN VOICE";
+		case SAMD_HUMAN_SILENCE: return "AMD HUMAN SILENCE";
+	}
+	return "";
 }

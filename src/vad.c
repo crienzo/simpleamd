@@ -104,8 +104,8 @@ void samd_vad_init(samd_vad_t **vad)
 
 	/* set detection defaults */
 	samd_vad_set_energy_threshold(new_vad, 200);
-	samd_vad_set_voice_ms(new_vad, 20);
-	samd_vad_set_silence_ms(new_vad, 200);
+	samd_vad_set_voice_ms(new_vad, 20); /* voice if 20 ms uninterrupted */
+	samd_vad_set_silence_ms(new_vad, 200); /* silence if 200 ms uninterrupted */
 
 	*vad = new_vad;
 }
@@ -123,10 +123,11 @@ static void vad_state_silence(samd_vad_t *vad, int in_voice)
 		if (vad->transition_frames >= vad->voice_frames) {
 			vad->state = vad_state_voice;
 			vad->transition_frames = 0;
-			samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) VOICE DETECTED\n", vad->total_samples);
+			samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) VOICE DETECTED\n", vad->time_ms);
 			vad->event_handler(SAMD_VAD_VOICE_BEGIN, vad->time_ms, vad->user_event_data);
 		}
 	} else {
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) energy = %f\n", vad->time_ms, vad->energy);
 		vad->transition_frames = 0;
 		vad->event_handler(SAMD_VAD_SILENCE, vad->time_ms, vad->user_event_data);
 	}
@@ -139,15 +140,19 @@ static void vad_state_silence(samd_vad_t *vad, int in_voice)
  */
 static void vad_state_voice(samd_vad_t *vad, int in_voice)
 {
-	samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) energy = %f, silence ms = %d\n", vad->time_ms, vad->energy, vad->transition_frames * AMD_MS_PER_FRAME);
 	if (in_voice) {
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) energy = %f\n", vad->time_ms, vad->energy);
 		vad->transition_frames = 0;
-		vad->event_handler(SAMD_VAD_VOICE, vad->total_samples, vad->user_event_data);
-	} else if (++vad->transition_frames >= vad->silence_frames) {
-		vad->state = vad_state_silence;
-		vad->transition_frames = 0;
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) SILENCE DETECTED\n", vad->total_samples);
-		vad->event_handler(SAMD_VAD_SILENCE_BEGIN, vad->time_ms, vad->user_event_data);
+		vad->event_handler(SAMD_VAD_VOICE, vad->time_ms, vad->user_event_data);
+	} else {
+		++vad->transition_frames;
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) energy = %f, silence ms = %d\n", vad->time_ms, vad->energy, vad->transition_frames * AMD_MS_PER_FRAME);
+		if (vad->transition_frames >= vad->silence_frames) {
+			vad->state = vad_state_silence;
+			vad->transition_frames = 0;
+			samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) SILENCE DETECTED\n", vad->time_ms);
+			vad->event_handler(SAMD_VAD_SILENCE_BEGIN, vad->time_ms, vad->user_event_data);
+		}
 	}
 }
 
@@ -183,4 +188,15 @@ void samd_vad_destroy(samd_vad_t **vad)
 	samd_log_printf((*vad), SAMD_LOG_DEBUG, "%d: DESTROY VAD\n", (*vad)->total_samples);
 	free(*vad);
 	*vad = NULL;
+}
+
+const char *samd_vad_event_to_string(samd_vad_event_t event)
+{
+	switch (event) {
+		case SAMD_VAD_SILENCE_BEGIN: return "VAD SILENCE BEGIN";
+		case SAMD_VAD_SILENCE: return "VAD SILENCE";
+		case SAMD_VAD_VOICE_BEGIN: return "VAD VOICE BEGIN";
+		case SAMD_VAD_VOICE: return "VAD VOICE";
+	}
+	return "";
 }
