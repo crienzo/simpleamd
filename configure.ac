@@ -13,15 +13,11 @@ AC_PROG_LIBTOOL
 # Checks for libraries.
 
 # Checks for header files.
-AC_CHECK_HEADERS([stdint.h stdlib.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
-AC_TYPE_INT16_T
-AC_TYPE_UINT32_T
 
 # Checks for library functions.
 AC_FUNC_MALLOC
-AC_CHECK_FUNCS([floor])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile])
