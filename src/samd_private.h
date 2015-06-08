@@ -73,6 +73,9 @@ struct samd {
 	/** time running */
 	uint32_t time_ms;
 
+	/** time spent in voice/silence while in opposite VAD state (e.g consecutive voice while in silence state) */
+	uint32_t transition_ms;
+
 	/** maximum frames to wait for voice before giving up */
 	uint32_t silence_start_ms;
 

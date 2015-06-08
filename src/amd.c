@@ -73,7 +73,8 @@ static void amd_state_detect(samd_t *amd, samd_vad_event_t event)
 			break;
 		case SAMD_VAD_VOICE_BEGIN:
 		case SAMD_VAD_VOICE:
-			if (amd->time_ms - amd->state_begin_ms >= amd->machine_ms) {
+			/* calculate time in voice minus any current silence (transition ms) we are hearing */
+			if (amd->time_ms - amd->state_begin_ms - amd->transition_ms >= amd->machine_ms) {
 				samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: Exceeded machine_ms, transition to MACHINE DETECTED\n", amd->time_ms);
 				amd->state_begin_ms = amd->time_ms;
 				amd->state = amd_state_machine_detected;
@@ -155,13 +156,15 @@ void samd_set_machine_ms(samd_t *amd, uint32_t ms)
  * Process VAD events
  * @param event VAD event
  * @param time_ms time this event occurred, relative to start of detector
+ * @param transition_ms duration spent in voice/silence while in opposite state
  * @param user_event_data the AMD
  */
-static void vad_event_handler(samd_vad_event_t event, uint32_t time_ms, void *user_event_data)
+static void vad_event_handler(samd_vad_event_t event, uint32_t time_ms, uint32_t transition_ms, void *user_event_data)
 {
 	/* forward event to state machine */
 	samd_t *amd = (samd_t *)user_event_data;
 	amd->time_ms = time_ms;
+	amd->transition_ms = transition_ms;
 	amd->state(amd, event);
 }
 
@@ -205,7 +208,7 @@ void samd_init(samd_t **amd, samd_vad_t *vad)
 
 	/* set detection defaults */
 	samd_set_silence_start_ms(new_amd, 2000); /* wait 2 seconds for start of speech */
-	samd_set_machine_ms(new_amd, 900); /* machine if at least 900 ms of voice */
+	samd_set_machine_ms(new_amd, 1100); /* machine if at least 1100 ms of voice */
 
 	/* link to VAD */
 	new_amd->vad = vad;

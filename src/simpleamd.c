@@ -13,8 +13,8 @@
 int debug = 0;
 int summarize = 0;
 int amd_silence_ms = 2000;
-int amd_machine_ms = 900;
-int vad_energy_threshold = 200;
+int amd_machine_ms = 1100;
+int vad_energy_threshold = 130;
 int vad_voice_ms = 20;
 int vad_silence_ms = 500;
 
@@ -140,10 +140,10 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 #define HELP USAGE"\n" \
 	"\t-f <raw audio file> 8000 kHz RAW LPCM input file\n" \
 	"\t-l <list file> text file listing raw audio files to test\n" \
-	"\t-e <vad energy> energy threshold (default 200)\n" \
+	"\t-e <vad energy> energy threshold (default 130)\n" \
 	"\t-v <vad voice ms> consecutive speech to trigger start of voice (default 20)\n" \
 	"\t-s <vad silence ms> consecutive silence to trigger start of silence (default 500)\n" \
-	"\t-m <amd machine ms> voice longer than this time is classified as machine (default 900)\n" \
+	"\t-m <amd machine ms> voice longer than this time is classified as machine (default 1100)\n" \
 	"\t-w <amd wait for voice ms> how long to wait for voice to begin (default 2000)\n" \
 	"\t-d Enable debug logging\n" \
 	"\t-r Summarize results\n"
@@ -245,7 +245,9 @@ int main(int argc, char **argv)
 			if ((newline = strrchr(raw_audio_file_buf, '\n'))) {
 				*newline = '\0';
 			}
-			analyze_file(&test_stats, raw_audio_file_buf, get_expected_result_from_audio_file_name(raw_audio_file_buf));
+			if (raw_audio_file_buf[0] != '\0' && raw_audio_file_buf[0] != '#') {
+				analyze_file(&test_stats, raw_audio_file_buf, get_expected_result_from_audio_file_name(raw_audio_file_buf));
+			}
 		}
 		fclose(list_file);
 	} else {
@@ -254,6 +256,9 @@ int main(int argc, char **argv)
 
 	/* output final stats */
 	if (summarize && test_stats.humans + test_stats.machines > 0) {
+		int total = 0;
+		int correctly_detected_total = 0;
+
 		printf("\n*** SUMMARY ***\n");
 		printf("expected,machines,humans,dead-air,unknown,accuracy\n");
 		if (test_stats.humans > 0) {
@@ -267,6 +272,9 @@ int main(int argc, char **argv)
 				test_stats.humans_detected_as_dead_air,
 				test_stats.humans_detected_as_unknown,
 				human_detection_accuracy);
+
+			total += test_stats.humans;
+			correctly_detected_total += detected_humans;
 		}
 
 		if (test_stats.machines > 0) {
@@ -279,7 +287,13 @@ int main(int argc, char **argv)
 				test_stats.machines_detected_as_dead_air,
 				test_stats.machines_detected_as_unknown,
 				machine_detection_accuracy);
+
+			total += test_stats.machines;
+			correctly_detected_total += detected_machines;
 		}
+
+		printf("\noverall accuracy = (%d/%d) * 100.0 = %f\n", correctly_detected_total, total,
+			((double)correctly_detected_total / (double)total) * 100.0);
 	}
 
 	return EXIT_SUCCESS;
