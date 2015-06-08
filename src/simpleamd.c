@@ -219,6 +219,10 @@ int main(int argc, char **argv)
 			case 'r':
 				summarize = 1;
 				break;
+			default:
+				printf("%s", HELP);
+				exit(EXIT_SUCCESS);
+				break;
 		}
 	}
 
