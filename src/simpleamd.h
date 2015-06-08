@@ -76,6 +76,7 @@ void samd_set_machine_ms(samd_t *amd, uint32_t ms);
 void samd_set_log_handler(samd_t *amd, samd_log_fn log_handler, void *user_log_data);
 void samd_set_event_handler(samd_t *amd, samd_event_fn event_handler, void *user_event_data);
 void samd_process_buffer(samd_t *amd, int16_t *samples, uint32_t num_samples);
+samd_vad_t *samd_get_vad(samd_t *vad);
 void samd_destroy(samd_t **amd);
 const char *samd_event_to_string(samd_event_t event);
 

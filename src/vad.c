@@ -185,9 +185,11 @@ void samd_vad_process_buffer(samd_vad_t *vad, int16_t *samples, uint32_t num_sam
  */
 void samd_vad_destroy(samd_vad_t **vad)
 {
-	samd_log_printf((*vad), SAMD_LOG_DEBUG, "%d: DESTROY VAD\n", (*vad)->total_samples);
-	free(*vad);
-	*vad = NULL;
+	if (vad && *vad) {
+		samd_log_printf((*vad), SAMD_LOG_DEBUG, "%d: DESTROY VAD\n", (*vad)->time_ms);
+		free(*vad);
+		*vad = NULL;
+	}
 }
 
 const char *samd_vad_event_to_string(samd_vad_event_t event)

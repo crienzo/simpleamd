@@ -61,8 +61,8 @@ int main(int argc, char **argv)
 	}
 
 	fclose(raw_audio_file);
-	samd_destroy(amd);
-	samd_destroy(vad);
+	samd_vad_destroy(&vad);
+	samd_destroy(&amd);
 
 	return EXIT_SUCCESS;
 }

@@ -231,8 +231,11 @@ void samd_process_buffer(samd_t *amd, int16_t *samples, uint32_t num_samples)
  */
 void samd_destroy(samd_t **amd)
 {
-	free(*amd);
-	*amd = NULL;
+	if (amd && *amd) {
+		samd_log_printf((*amd), SAMD_LOG_DEBUG, "%d: DESTROY AMD\n", (*amd)->time_ms);
+		free(*amd);
+		*amd = NULL;
+	}
 }
 
 const char *samd_event_to_string(samd_event_t event)
@@ -245,4 +248,9 @@ const char *samd_event_to_string(samd_event_t event)
 		case SAMD_HUMAN_SILENCE: return "AMD HUMAN SILENCE";
 	}
 	return "";
+}
+
+samd_vad_t *samd_get_vad(samd_t *amd)
+{
+	return amd->vad;
 }
