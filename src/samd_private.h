@@ -59,9 +59,6 @@ struct samd_vad {
 	/** number of samples processed in current frame */
 	uint32_t samples;
 
-	/** total number of samples processed */
-	uint32_t total_samples;
-
 	/** number of consecutive voice or silence frames processed prior to transitioning state */
 	uint32_t transition_frames;
 };

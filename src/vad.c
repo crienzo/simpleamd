@@ -98,7 +98,6 @@ void samd_vad_init(samd_vad_t **vad)
 	new_vad->state = vad_state_silence;
 	new_vad->energy = 0.0;
 	new_vad->samples = 0;
-	new_vad->total_samples = 0;
 	new_vad->transition_frames = 0;
 	new_vad->time_ms = 0;
 	new_vad->last_sample = 0;
@@ -171,15 +170,22 @@ void samd_vad_process_buffer(samd_vad_t *vad, int16_t *samples, uint32_t num_sam
 	for (i = 0; i < num_samples; i++) {
 		vad->energy += abs(samples[i]);
 		vad->samples++;
-		vad->total_samples++;
-		//if ((vad->last_sample < 0 && samples[i] > 0) || (vad->last_sample > 0 && samples[i] < 0)) {
+
+		/* collect zero crossing data - this is a rough measure of frequency and does correlate to 
+		   voice activity.  Not currently using this data for voice detection- it is informational for now */
 		if (vad->last_sample < 0 && samples[i] >= 0) {
 			vad->zero_crossings++;
 		}
 		vad->last_sample = samples[i];
+
 		if (vad->samples >= AMD_SAMPLES_PER_FRAME) {
+			/* final energy calculation for frame */
 			vad->energy = vad->energy / AMD_SAMPLES_PER_FRAME;
+
+			/* notify event handler of state */
 			vad->state(vad, (uint32_t)vad->energy > vad->threshold);
+
+			/* reset for next frame */
 			vad->energy = 0.0;
 			vad->samples = 0;
 			vad->zero_crossings = 0;
