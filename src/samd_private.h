@@ -9,10 +9,6 @@
 
 #include "simpleamd.h"
 
-#define AMD_SAMPLES_PER_MS 8
-#define AMD_SAMPLES_PER_FRAME 80
-#define AMD_MS_PER_FRAME 10
-
 /** internal VAD state machine function type */
 typedef void (* samd_vad_state_fn)(samd_vad_t *vad, int in_voice);
 
@@ -29,11 +25,11 @@ struct samd_vad {
 	/** energy threshold - values above this are voice slices */
 	uint32_t threshold;
 
-	/** number of consecutive voice frames to trigger transition to voice */
-	uint32_t voice_frames;
+	/** duration of voice to trigger transition to voice */
+	uint32_t voice_ms;
 
-	/** number of consecutive silence frames to trigger transition to silence */
-	uint32_t silence_frames;
+	/** duration of silence to trigger transition to silence */
+	uint32_t silence_ms;
 
 	/** user data to send to callbacks */
 	void *user_event_data;
@@ -44,8 +40,11 @@ struct samd_vad {
 	/** current detection state */
 	samd_vad_state_fn state;
 
-	/** energy detected in current frame */
-	double energy;
+	/** energy detected in current frame channels (mono or stereo only) */
+	double energy[2];
+
+	/** normalizes energy calculation over different sample rates */
+	uint32_t downsample_factor;
 
 	/** last sample processed */
 	int16_t last_sample;
@@ -59,8 +58,10 @@ struct samd_vad {
 	/** number of samples processed in current frame */
 	uint32_t samples;
 
-	/** number of consecutive voice or silence frames processed prior to transitioning state */
-	uint32_t transition_frames;
+	/** duration of voice or silence processed prior to transitioning state */
+	uint32_t transition_ms;
+
+	uint32_t samples_per_frame;
 };
 
 /** Internal AMD state machine function type */

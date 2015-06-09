@@ -17,6 +17,8 @@ int amd_machine_ms = 1100;
 int vad_energy_threshold = 130;
 int vad_voice_ms = 20;
 int vad_silence_ms = 500;
+int vad_sample_rate = 8000;
+int vad_channels = 1;
 
 static const char *result_string[4] = { "unknown", "human", "machine", "dead-air" };
 enum amd_test_result {
@@ -77,6 +79,7 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 		fprintf(stderr, "Failed to initialize AMD VAD\n");
 		exit(EXIT_FAILURE);
 	}
+	samd_vad_set_sample_rate(vad, vad_sample_rate);
 	samd_vad_set_energy_threshold(vad, vad_energy_threshold); /* energy above this threshold is considered voice */
 	samd_vad_set_silence_ms(vad, vad_silence_ms); /* how long to wait for end of voice */
 	samd_vad_set_voice_ms(vad, vad_voice_ms); /* how long to wait for start of voice */
@@ -105,7 +108,7 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 	while (!feof(raw_audio_file) && !ferror(raw_audio_file) && result == RESULT_UNKNOWN) {
 		size_t num_samples = fread(samples, sizeof(int16_t), 80, raw_audio_file);
 		if (num_samples > 0) {
-			samd_process_buffer(amd, samples, num_samples);
+			samd_process_buffer(amd, samples, num_samples, vad_channels);
 		}
 	}
 
@@ -138,15 +141,17 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 
 #define USAGE "simpleamd <-f <raw audio file>|-l <list file>>"
 #define HELP USAGE"\n" \
-	"\t-f <raw audio file> 8000 kHz RAW LPCM input file\n" \
+	"\t-f <raw audio file> RAW LPCM input file\n" \
 	"\t-l <list file> text file listing raw audio files to test\n" \
 	"\t-e <vad energy> energy threshold (default 130)\n" \
 	"\t-v <vad voice ms> consecutive speech to trigger start of voice (default 20)\n" \
 	"\t-s <vad silence ms> consecutive silence to trigger start of silence (default 500)\n" \
+	"\t-r <vad sample rate> sample rate of input audio (default 8000)\n" \
+	"\t-c <vad channels> number of channels per sample (default 1)\n" \
 	"\t-m <amd machine ms> voice longer than this time is classified as machine (default 1100)\n" \
 	"\t-w <amd wait for voice ms> how long to wait for voice to begin (default 2000)\n" \
 	"\t-d Enable debug logging\n" \
-	"\t-r Summarize results\n"
+	"\t-R Summarize results\n"
 
 int main(int argc, char **argv)
 {
@@ -155,7 +160,7 @@ int main(int argc, char **argv)
 	char *raw_audio_file_name = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "f:l:e:v:s:m:w:dr")) != -1) {
+	while ((opt = getopt(argc, argv, "f:l:e:v:s:m:w:c:r:dR")) != -1) {
 		switch (opt) {
 			case 'f':
 				raw_audio_file_name = strdup(optarg);
@@ -193,6 +198,25 @@ int main(int argc, char **argv)
 				}
 				break;
 			}
+			case 'r': {
+				int val = atoi(optarg);
+				if (val >= 8000) {
+					vad_sample_rate = val;
+				} else {
+					fprintf(stderr, "option -r must be >= 8000\n");
+					exit(EXIT_FAILURE);
+				}
+			}
+			case 'c': {
+				int val = atoi(optarg);
+				if (val > 0) {
+					vad_channels = val;
+				} else {
+					fprintf(stderr, "option -c must be > 0\n");
+					exit(EXIT_FAILURE);
+				}
+				break;
+			}
 			case 'm': {
 				int val = atoi(optarg);
 				if (val > 0) {
@@ -216,7 +240,7 @@ int main(int argc, char **argv)
 			case 'd':
 				debug = 1;
 				break;
-			case 'r':
+			case 'R':
 				summarize = 1;
 				break;
 			default:

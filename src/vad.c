@@ -12,6 +12,8 @@
 static void vad_state_silence(samd_vad_t *vad, int in_voice);
 static void vad_state_voice(samd_vad_t *vad, int in_voice);
 
+#define VAD_MS_PER_FRAME 10
+#define VAD_SAMPLES_PER_FRAME_DIVISOR 100
 
 /**
  * NO-OP log handler
@@ -68,7 +70,7 @@ void samd_vad_set_energy_threshold(samd_vad_t *vad, uint32_t threshold)
  */
 void samd_vad_set_voice_ms(samd_vad_t *vad, uint32_t ms)
 {
-	vad->voice_frames = (uint32_t)floor(ms / AMD_MS_PER_FRAME);
+	vad->voice_ms = ms;
 }
 
 /**
@@ -78,7 +80,26 @@ void samd_vad_set_voice_ms(samd_vad_t *vad, uint32_t ms)
  */
 void samd_vad_set_silence_ms(samd_vad_t *vad, uint32_t ms)
 {
-	vad->silence_frames = (uint32_t)floor(ms / AMD_MS_PER_FRAME);
+	vad->silence_ms = ms;
+}
+
+/**
+ * Set the sample rate of the audio
+ * @param vad
+ * @param sample_rate
+ */
+void samd_vad_set_sample_rate(samd_vad_t *vad, uint32_t sample_rate)
+{
+	vad->samples_per_frame = sample_rate / VAD_SAMPLES_PER_FRAME_DIVISOR;
+	vad->downsample_factor = sample_rate / 8000;
+	if (vad->downsample_factor < 1) {
+		vad->downsample_factor = 1;
+	}
+
+	/* reset any in progress energy calculations */
+	vad->samples = 0;
+	vad->energy[0] = 0.0;
+	vad->energy[1] = 0.0;
 }
 
 /**
@@ -96,14 +117,16 @@ void samd_vad_init(samd_vad_t **vad)
 
 	/* reset detection state */
 	new_vad->state = vad_state_silence;
-	new_vad->energy = 0.0;
+	new_vad->energy[0] = 0.0;
+	new_vad->energy[1] = 0.0;
 	new_vad->samples = 0;
-	new_vad->transition_frames = 0;
+	new_vad->transition_ms = 0;
 	new_vad->time_ms = 0;
 	new_vad->last_sample = 0;
 	new_vad->zero_crossings = 0;
 
 	/* set detection defaults */
+	samd_vad_set_sample_rate(new_vad, 8000);
 	samd_vad_set_energy_threshold(new_vad, 130);
 	samd_vad_set_voice_ms(new_vad, 20); /* voice if 20 ms uninterrupted */
 	samd_vad_set_silence_ms(new_vad, 200); /* silence if 200 ms uninterrupted */
@@ -119,18 +142,18 @@ void samd_vad_init(samd_vad_t **vad)
 static void vad_state_silence(samd_vad_t *vad, int in_voice)
 {
 	if (in_voice) {
-		++vad->transition_frames;
+		vad->transition_ms += VAD_MS_PER_FRAME;
 	} else {
-		vad->transition_frames = 0;
+		vad->transition_ms = 0;
 	}
-	if (vad->transition_frames >= vad->voice_frames) {
+	if (vad->transition_ms >= vad->voice_ms) {
 		vad->state = vad_state_voice;
-		vad->transition_frames = 0;
+		vad->transition_ms = 0;
 		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) VOICE DETECTED\n", vad->time_ms);
 		vad->event_handler(SAMD_VAD_VOICE_BEGIN, vad->time_ms, 0, vad->user_event_data);
 	} else {
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) energy = %f, voice ms = %d, zero crossings = %d\n", vad->time_ms, vad->energy, vad->transition_frames * AMD_MS_PER_FRAME, vad->zero_crossings);
-		vad->event_handler(SAMD_VAD_SILENCE, vad->time_ms, vad->transition_frames * AMD_MS_PER_FRAME, vad->user_event_data);
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) energy = %f, voice ms = %d, zero crossings = %d\n", vad->time_ms, fmax(vad->energy[0], vad->energy[1]), vad->transition_ms, vad->zero_crossings);
+		vad->event_handler(SAMD_VAD_SILENCE, vad->time_ms, vad->transition_ms, vad->user_event_data);
 	}
 }
 
@@ -142,19 +165,19 @@ static void vad_state_silence(samd_vad_t *vad, int in_voice)
 static void vad_state_voice(samd_vad_t *vad, int in_voice)
 {
 	if (in_voice) {
-		vad->transition_frames = 0;
+		vad->transition_ms = 0;
 	} else {
-		++vad->transition_frames;
+		vad->transition_ms += VAD_MS_PER_FRAME;
 	}
 
-	if (vad->transition_frames >= vad->silence_frames) {
+	if (vad->transition_ms >= vad->silence_ms) {
 		vad->state = vad_state_silence;
-		vad->transition_frames = 0;
+		vad->transition_ms = 0;
 		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) SILENCE DETECTED\n", vad->time_ms);
 		vad->event_handler(SAMD_VAD_SILENCE_BEGIN, vad->time_ms, 0, vad->user_event_data);
 	} else {
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) energy = %f, silence ms = %d, zero crossings = %d\n", vad->time_ms, vad->energy, vad->transition_frames * AMD_MS_PER_FRAME, vad->zero_crossings);
-		vad->event_handler(SAMD_VAD_VOICE, vad->time_ms, vad->transition_frames * AMD_MS_PER_FRAME, vad->user_event_data);
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) energy = %f, silence ms = %d, zero crossings = %d\n", vad->time_ms, fmax(vad->energy[0], vad->energy[1]), vad->transition_ms, vad->zero_crossings);
+		vad->event_handler(SAMD_VAD_VOICE, vad->time_ms, vad->transition_ms, vad->user_event_data);
 	}
 }
 
@@ -163,33 +186,52 @@ static void vad_state_voice(samd_vad_t *vad, int in_voice)
  * @param vad
  * @param samples
  * @param num_samples
+ * @param channels
  */
-void samd_vad_process_buffer(samd_vad_t *vad, int16_t *samples, uint32_t num_samples)
+void samd_vad_process_buffer(samd_vad_t *vad, int16_t *samples, uint32_t num_samples, uint32_t channels)
 {
 	uint32_t i;
-	for (i = 0; i < num_samples; i++) {
-		vad->energy += abs(samples[i]);
+	for (i = 0; i < num_samples; i += channels) {
+		int32_t mixed_sample = 0;
+		uint32_t c;
+
 		vad->samples++;
+
+		/* mix audio for zero crossing data, calculate energy separately per channel */
+		for (c = 0; c < channels && c < 2; c++) {
+			mixed_sample += samples[i + c];
+			if (i % vad->downsample_factor == 0) {
+				/* naive downsample */
+				vad->energy[c] += abs(samples[i + c]);
+			}
+		}
+		if (mixed_sample > INT16_MAX) {
+			mixed_sample = INT16_MAX;
+		} else if (mixed_sample < INT16_MIN) {
+			mixed_sample = INT16_MIN;
+		}
 
 		/* collect zero crossing data - this is a rough measure of frequency and does correlate to 
 		   voice activity.  Not currently using this data for voice detection- it is informational for now */
-		if (vad->last_sample < 0 && samples[i] >= 0) {
+		if (vad->last_sample < 0 && mixed_sample >= 0) {
 			vad->zero_crossings++;
 		}
-		vad->last_sample = samples[i];
+		vad->last_sample = mixed_sample;
 
-		if (vad->samples >= AMD_SAMPLES_PER_FRAME) {
+		if (vad->samples >= vad->samples_per_frame) {
 			/* final energy calculation for frame */
-			vad->energy = vad->energy / AMD_SAMPLES_PER_FRAME;
+			vad->energy[0] = vad->energy[0] / (vad->samples / vad->downsample_factor);
+			vad->energy[1] = vad->energy[1] / (vad->samples / vad->downsample_factor);
 
 			/* notify event handler of state */
-			vad->state(vad, (uint32_t)vad->energy > vad->threshold);
+			vad->state(vad, (uint32_t)fmax(vad->energy[0], vad->energy[1]) > vad->threshold);
 
 			/* reset for next frame */
-			vad->energy = 0.0;
+			vad->energy[0] = 0.0;
+			vad->energy[1] = 0.0;
 			vad->samples = 0;
 			vad->zero_crossings = 0;
-			vad->time_ms += AMD_MS_PER_FRAME;
+			vad->time_ms += VAD_MS_PER_FRAME;
 		}
 	}
 }

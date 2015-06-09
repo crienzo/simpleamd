@@ -222,10 +222,11 @@ void samd_init(samd_t **amd, samd_vad_t *vad)
  * @param amd
  * @param samples
  * @param num_samples
+ * @param channels
  */
-void samd_process_buffer(samd_t *amd, int16_t *samples, uint32_t num_samples)
+void samd_process_buffer(samd_t *amd, int16_t *samples, uint32_t num_samples, uint32_t channels)
 {
-	samd_vad_process_buffer(amd->vad, samples, num_samples);
+	samd_vad_process_buffer(amd->vad, samples, num_samples, channels);
 }
 
 /**
