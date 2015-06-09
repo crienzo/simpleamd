@@ -43,11 +43,17 @@ struct samd_vad {
 	/** energy detected in current frame channels (mono or stereo only) */
 	double energy[2];
 
-	/** how much initial energy to collect before starting VAD */
-	uint32_t initial_energy_ms;
+	/** total energy observed */
+	double total_energy;
 
-	/** first frames of energy calculated (used to determine background noise level) */
-	double initial_energy;
+	/** maximum factor to adjust threshold relative to current threshold. */
+	uint32_t threshold_adjust_limit;
+
+	/** time relative to start to adjust energy threshold.  0 to disable. */
+	uint32_t initial_adjust_ms;
+
+	/** time relative to start of voice to adjust energy threshold.  0 to disable. */
+	uint32_t voice_adjust_ms;
 
 	/** normalizes energy calculation over different sample rates */
 	uint32_t downsample_factor;
@@ -69,6 +75,9 @@ struct samd_vad {
 
 	/** duration of voice or silence processed prior to transitioning state */
 	uint32_t transition_ms;
+
+	/** Time when first speech heard */
+	uint32_t initial_voice_time_ms;
 
 	uint32_t samples_per_frame;
 };

@@ -19,7 +19,9 @@ int vad_voice_ms = 20;
 int vad_silence_ms = 500;
 int vad_sample_rate = 8000;
 int vad_channels = 1;
-int vad_init_ms = 100;
+int vad_initial_adjust_ms = 100;
+int vad_voice_adjust_ms = 50;
+int vad_adjust_limit = 3;
 
 static const char *result_string[4] = { "unknown", "human", "machine", "dead-air" };
 enum amd_test_result {
@@ -84,7 +86,9 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 	samd_vad_set_energy_threshold(vad, vad_energy_threshold); /* energy above this threshold is considered voice */
 	samd_vad_set_silence_ms(vad, vad_silence_ms); /* how long to wait for end of voice */
 	samd_vad_set_voice_ms(vad, vad_voice_ms); /* how long to wait for start of voice */
-	samd_vad_set_init_ms(vad, vad_init_ms); /* how long to measure audio before starting VAD */
+	samd_vad_set_initial_adjust_ms(vad, vad_initial_adjust_ms); /* time to adjust energy threshold relative to start */
+	samd_vad_set_voice_adjust_ms(vad, vad_voice_adjust_ms); /* time to adjust energy threshold relative to start of voice */
+	samd_vad_set_adjust_limit(vad, vad_adjust_limit);
 	if (debug) {
 		samd_vad_set_log_handler(vad, amd_logger, (void *)raw_audio_file_name);
 	}
@@ -148,9 +152,11 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 	"\t-e <vad energy> Energy threshold (default 130)\n" \
 	"\t-v <vad voice ms> Consecutive speech to trigger start of voice (default 20)\n" \
 	"\t-s <vad silence ms> Consecutive silence to trigger start of silence (default 500)\n" \
-	"\t-i <vad init ms> Time to measure background environment before starting VAD.  Disable with 0. (default 100)\n" \
+	"\t-i <vad initial adjust ms> Time to measure background environment before starting VAD.  Disable with 0. (default 100)\n" \
 	"\t-r <vad sample rate> Sample rate of input audio (default 8000)\n" \
 	"\t-c <vad channels> Number of channels per sample (default 1)\n" \
+	"\t-n <vad voice adjust ms> Time relative to start of initial utterance for voice adjustment.  Disable with 0. (default 50)\n" \
+	"\t-a <vad adjust threshold> maximum factor to adjust energy threshold relative to current threshold.  (default 3)\n" \
 	"\t-m <amd machine ms> Voice longer than this time is classified as machine (default 1100)\n" \
 	"\t-w <amd wait for voice ms> How long to wait for voice to begin (default 2000)\n" \
 	"\t-d Enable debug logging\n" \
@@ -163,7 +169,7 @@ int main(int argc, char **argv)
 	char *raw_audio_file_name = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "f:l:e:v:s:i:m:w:c:r:dR")) != -1) {
+	while ((opt = getopt(argc, argv, "a:f:l:e:v:s:i:m:w:c:r:n:dR")) != -1) {
 		switch (opt) {
 			case 'f':
 				raw_audio_file_name = strdup(optarg);
@@ -204,9 +210,30 @@ int main(int argc, char **argv)
 			case 'i': {
 				int val = atoi(optarg);
 				if (val >= 0) {
-					vad_init_ms = val;
+					vad_initial_adjust_ms = val;
 				} else {
-					fprintf(stderr, "option -i (vad init ms) must be > 0\n");
+					fprintf(stderr, "option -i (vad initial adjust ms) must be >= 0\n");
+					exit(EXIT_FAILURE);
+				}
+				break;
+			}
+			case 'n': {
+				int val = atoi(optarg);
+				if (val >= 0) {
+					vad_voice_adjust_ms = val;
+				} else {
+					fprintf(stderr, "option -n (vad voice adjust ms) must be >= 0\n");
+					exit(EXIT_FAILURE);
+				}
+				break;
+			}
+			case 'a': {
+				int val = atoi(optarg);
+				if (val > 0) {
+					vad_adjust_limit = val;
+				} else {
+					fprintf(stderr, "option -a (vad adjust limit) must be > 0\n");
+					exit(EXIT_FAILURE);
 				}
 				break;
 			}
