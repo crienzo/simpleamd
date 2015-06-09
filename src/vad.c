@@ -14,6 +14,10 @@ static void vad_state_voice(samd_vad_t *vad, int in_voice);
 
 #define VAD_MS_PER_FRAME 10
 #define VAD_SAMPLES_PER_FRAME_DIVISOR 100
+#define VAD_INTERNAL_SAMPLE_RATE 8000
+#define VAD_DEFAULT_ENERGY_THRESHOLD 130.0
+#define VAD_DEFAULT_VOICE_MS 20
+#define VAD_DEFAULT_SILENCE_MS 200
 
 /**
  * NO-OP log handler
@@ -58,7 +62,7 @@ void samd_vad_set_event_handler(samd_vad_t *vad, samd_vad_event_fn event_handler
  * @param vad
  * @param threshold 200 or so seems like a good starting point
  */
-void samd_vad_set_energy_threshold(samd_vad_t *vad, uint32_t threshold)
+void samd_vad_set_energy_threshold(samd_vad_t *vad, double threshold)
 {
 	vad->threshold = threshold;
 }
@@ -91,7 +95,7 @@ void samd_vad_set_silence_ms(samd_vad_t *vad, uint32_t ms)
 void samd_vad_set_sample_rate(samd_vad_t *vad, uint32_t sample_rate)
 {
 	vad->samples_per_frame = sample_rate / VAD_SAMPLES_PER_FRAME_DIVISOR;
-	vad->downsample_factor = sample_rate / 8000;
+	vad->downsample_factor = sample_rate / VAD_INTERNAL_SAMPLE_RATE;
 	if (vad->downsample_factor < 1) {
 		vad->downsample_factor = 1;
 	}
@@ -100,6 +104,15 @@ void samd_vad_set_sample_rate(samd_vad_t *vad, uint32_t sample_rate)
 	vad->samples = 0;
 	vad->energy[0] = 0.0;
 	vad->energy[1] = 0.0;
+}
+
+/**
+ * Set time to measure environment before starting VAD.  Set to 0 to disable.
+ * Default is 100 ms
+ */
+void samd_vad_set_init_ms(samd_vad_t *vad, uint32_t ms)
+{
+	vad->initial_energy_ms = ms;
 }
 
 /**
@@ -124,12 +137,14 @@ void samd_vad_init(samd_vad_t **vad)
 	new_vad->time_ms = 0;
 	new_vad->last_sample = 0;
 	new_vad->zero_crossings = 0;
+	new_vad->initial_energy = 0.0;
+	new_vad->initial_energy_ms = 10 * VAD_MS_PER_FRAME;
 
 	/* set detection defaults */
-	samd_vad_set_sample_rate(new_vad, 8000);
-	samd_vad_set_energy_threshold(new_vad, 130);
-	samd_vad_set_voice_ms(new_vad, 20); /* voice if 20 ms uninterrupted */
-	samd_vad_set_silence_ms(new_vad, 200); /* silence if 200 ms uninterrupted */
+	samd_vad_set_sample_rate(new_vad, VAD_INTERNAL_SAMPLE_RATE);
+	samd_vad_set_energy_threshold(new_vad, VAD_DEFAULT_ENERGY_THRESHOLD);
+	samd_vad_set_voice_ms(new_vad, VAD_DEFAULT_VOICE_MS);
+	samd_vad_set_silence_ms(new_vad, VAD_DEFAULT_SILENCE_MS);
 
 	*vad = new_vad;
 }
@@ -219,19 +234,38 @@ void samd_vad_process_buffer(samd_vad_t *vad, int16_t *samples, uint32_t num_sam
 		vad->last_sample = mixed_sample;
 
 		if (vad->samples >= vad->samples_per_frame) {
+			vad->time_ms += VAD_MS_PER_FRAME;
+
 			/* final energy calculation for frame */
 			vad->energy[0] = vad->energy[0] / (vad->samples / vad->downsample_factor);
 			vad->energy[1] = vad->energy[1] / (vad->samples / vad->downsample_factor);
 
-			/* notify event handler of state */
-			vad->state(vad, (uint32_t)fmax(vad->energy[0], vad->energy[1]) > vad->threshold);
+			if (vad->time_ms <= vad->initial_energy_ms) {
+				/* collect initial energy measures */
+				vad->initial_energy += fmax(vad->energy[0], vad->energy[1]);
+
+				/* calculate background noise once enough initial frames have been collected */
+				if (vad->time_ms == vad->initial_energy_ms) {
+					double new_threshold = 0;
+					vad->initial_energy = vad->initial_energy / (vad->initial_energy_ms / VAD_MS_PER_FRAME);
+					new_threshold = fmin(vad->initial_energy * 0.8, vad->threshold * 3);
+					if (new_threshold > vad->threshold) {
+						samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: increasing threshold %f to %f, initial energy = %f\n", vad->time_ms, vad->threshold, new_threshold, vad->initial_energy);
+						vad->threshold = vad->initial_energy;
+					} else {
+						samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: threshold = %f, initial average energy = %f\n", vad->time_ms, vad->threshold, vad->initial_energy);
+					}
+				}
+			} else {
+				/* execute VAD state machine after initial measures are completed */
+				vad->state(vad, fmax(vad->energy[0], vad->energy[1]) > vad->threshold);
+			}
 
 			/* reset for next frame */
 			vad->energy[0] = 0.0;
 			vad->energy[1] = 0.0;
 			vad->samples = 0;
 			vad->zero_crossings = 0;
-			vad->time_ms += VAD_MS_PER_FRAME;
 		}
 	}
 }

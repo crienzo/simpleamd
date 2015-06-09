@@ -14,11 +14,12 @@ int debug = 0;
 int summarize = 0;
 int amd_silence_ms = 2000;
 int amd_machine_ms = 1100;
-int vad_energy_threshold = 130;
+double vad_energy_threshold = 130.0;
 int vad_voice_ms = 20;
 int vad_silence_ms = 500;
 int vad_sample_rate = 8000;
 int vad_channels = 1;
+int vad_init_ms = 100;
 
 static const char *result_string[4] = { "unknown", "human", "machine", "dead-air" };
 enum amd_test_result {
@@ -41,7 +42,7 @@ struct amd_test_stats {
 
 static void amd_logger(samd_log_level_t level, void *user_log_data, const char *file, int line, const char *message)
 {
-	printf("%s:%d\t%s", file, line, message);
+	printf("%s\t\t%s:%d\t%s", (char *)user_log_data, file, line, message);
 }
 
 static void amd_event_handler(samd_event_t event, uint32_t time_ms, void *user_event_data)
@@ -83,8 +84,9 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 	samd_vad_set_energy_threshold(vad, vad_energy_threshold); /* energy above this threshold is considered voice */
 	samd_vad_set_silence_ms(vad, vad_silence_ms); /* how long to wait for end of voice */
 	samd_vad_set_voice_ms(vad, vad_voice_ms); /* how long to wait for start of voice */
+	samd_vad_set_init_ms(vad, vad_init_ms); /* how long to measure audio before starting VAD */
 	if (debug) {
-		samd_vad_set_log_handler(vad, amd_logger, NULL);
+		samd_vad_set_log_handler(vad, amd_logger, (void *)raw_audio_file_name);
 	}
 
 	samd_init(&amd, vad);
@@ -96,7 +98,7 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 	samd_set_silence_start_ms(amd, amd_silence_ms); /* maximum duration of initial silence to allow */
 	samd_set_event_handler(amd, amd_event_handler, &result);
 	if (debug) {
-		samd_set_log_handler(amd, amd_logger, NULL);
+		samd_set_log_handler(amd, amd_logger, (void *)raw_audio_file_name);
 	}
 
 	raw_audio_file = fopen(raw_audio_file_name, "rb");
@@ -142,14 +144,15 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 #define USAGE "simpleamd <-f <raw audio file>|-l <list file>>"
 #define HELP USAGE"\n" \
 	"\t-f <raw audio file> RAW LPCM input file\n" \
-	"\t-l <list file> text file listing raw audio files to test\n" \
-	"\t-e <vad energy> energy threshold (default 130)\n" \
-	"\t-v <vad voice ms> consecutive speech to trigger start of voice (default 20)\n" \
-	"\t-s <vad silence ms> consecutive silence to trigger start of silence (default 500)\n" \
-	"\t-r <vad sample rate> sample rate of input audio (default 8000)\n" \
-	"\t-c <vad channels> number of channels per sample (default 1)\n" \
-	"\t-m <amd machine ms> voice longer than this time is classified as machine (default 1100)\n" \
-	"\t-w <amd wait for voice ms> how long to wait for voice to begin (default 2000)\n" \
+	"\t-l <list file> Text file listing raw audio files to test\n" \
+	"\t-e <vad energy> Energy threshold (default 130)\n" \
+	"\t-v <vad voice ms> Consecutive speech to trigger start of voice (default 20)\n" \
+	"\t-s <vad silence ms> Consecutive silence to trigger start of silence (default 500)\n" \
+	"\t-i <vad init ms> Time to measure background environment before starting VAD.  Disable with 0. (default 100)\n" \
+	"\t-r <vad sample rate> Sample rate of input audio (default 8000)\n" \
+	"\t-c <vad channels> Number of channels per sample (default 1)\n" \
+	"\t-m <amd machine ms> Voice longer than this time is classified as machine (default 1100)\n" \
+	"\t-w <amd wait for voice ms> How long to wait for voice to begin (default 2000)\n" \
 	"\t-d Enable debug logging\n" \
 	"\t-R Summarize results\n"
 
@@ -160,7 +163,7 @@ int main(int argc, char **argv)
 	char *raw_audio_file_name = NULL;
 	int opt;
 
-	while ((opt = getopt(argc, argv, "f:l:e:v:s:m:w:c:r:dR")) != -1) {
+	while ((opt = getopt(argc, argv, "f:l:e:v:s:i:m:w:c:r:dR")) != -1) {
 		switch (opt) {
 			case 'f':
 				raw_audio_file_name = strdup(optarg);
@@ -169,11 +172,11 @@ int main(int argc, char **argv)
 				list_file_name = strdup(optarg);
 				break;
 			case 'e': {
-				int val = atoi(optarg);
-				if (val > 0 && val < 32767) {
+				double val = atof(optarg);
+				if (val > 0.0 && val < 32767.0) {
 					vad_energy_threshold = val;
 				} else {
-					fprintf(stderr, "option -e must be > 0 and < 32767\n");
+					fprintf(stderr, "option -e (vad energy threshold) must be > 0 and < 32767\n");
 					exit(EXIT_FAILURE);
 				}
 				break;
@@ -183,7 +186,7 @@ int main(int argc, char **argv)
 				if (val > 0) {
 					vad_voice_ms = val;
 				} else {
-					fprintf(stderr, "option -v must be > 0\n");
+					fprintf(stderr, "option -v (vad voice ms) must be > 0\n");
 					exit(EXIT_FAILURE);
 				}
 				break;
@@ -193,8 +196,17 @@ int main(int argc, char **argv)
 				if (val > 0) {
 					vad_silence_ms = val;
 				} else {
-					fprintf(stderr, "option -s must be > 0\n");
+					fprintf(stderr, "option -s (vad silence ms) must be > 0\n");
 					exit(EXIT_FAILURE);
+				}
+				break;
+			}
+			case 'i': {
+				int val = atoi(optarg);
+				if (val >= 0) {
+					vad_init_ms = val;
+				} else {
+					fprintf(stderr, "option -i (vad init ms) must be > 0\n");
 				}
 				break;
 			}
@@ -203,7 +215,7 @@ int main(int argc, char **argv)
 				if (val >= 8000) {
 					vad_sample_rate = val;
 				} else {
-					fprintf(stderr, "option -r must be >= 8000\n");
+					fprintf(stderr, "option -r (vad sample rate) must be >= 8000\n");
 					exit(EXIT_FAILURE);
 				}
 			}
@@ -212,7 +224,7 @@ int main(int argc, char **argv)
 				if (val > 0) {
 					vad_channels = val;
 				} else {
-					fprintf(stderr, "option -c must be > 0\n");
+					fprintf(stderr, "option -c (vad channels) must be > 0\n");
 					exit(EXIT_FAILURE);
 				}
 				break;
@@ -222,7 +234,7 @@ int main(int argc, char **argv)
 				if (val > 0) {
 					amd_machine_ms = val;
 				} else {
-					fprintf(stderr, "option -m must be > 0\n");
+					fprintf(stderr, "option -m (amd machine ms) must be > 0\n");
 					exit(EXIT_FAILURE);
 				}
 				break;
@@ -232,7 +244,7 @@ int main(int argc, char **argv)
 				if (val > 0) {
 					amd_silence_ms = val;
 				} else {
-					fprintf(stderr, "option -w must be > 0\n");
+					fprintf(stderr, "option -w (amd wait for voice ms) must be > 0\n");
 					exit(EXIT_FAILURE);
 				}
 				break;
