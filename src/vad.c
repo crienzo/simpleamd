@@ -101,6 +101,8 @@ void samd_vad_init(samd_vad_t **vad)
 	new_vad->total_samples = 0;
 	new_vad->transition_frames = 0;
 	new_vad->time_ms = 0;
+	new_vad->last_sample = 0;
+	new_vad->zero_crossings = 0;
 
 	/* set detection defaults */
 	samd_vad_set_energy_threshold(new_vad, 130);
@@ -128,7 +130,7 @@ static void vad_state_silence(samd_vad_t *vad, int in_voice)
 		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) VOICE DETECTED\n", vad->time_ms);
 		vad->event_handler(SAMD_VAD_VOICE_BEGIN, vad->time_ms, 0, vad->user_event_data);
 	} else {
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) energy = %f, voice ms = %d\n", vad->time_ms, vad->energy, vad->transition_frames * AMD_MS_PER_FRAME);
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) energy = %f, voice ms = %d, zero crossings = %d\n", vad->time_ms, vad->energy, vad->transition_frames * AMD_MS_PER_FRAME, vad->zero_crossings);
 		vad->event_handler(SAMD_VAD_SILENCE, vad->time_ms, vad->transition_frames * AMD_MS_PER_FRAME, vad->user_event_data);
 	}
 }
@@ -152,7 +154,7 @@ static void vad_state_voice(samd_vad_t *vad, int in_voice)
 		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) SILENCE DETECTED\n", vad->time_ms);
 		vad->event_handler(SAMD_VAD_SILENCE_BEGIN, vad->time_ms, 0, vad->user_event_data);
 	} else {
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) energy = %f, silence ms = %d\n", vad->time_ms, vad->energy, vad->transition_frames * AMD_MS_PER_FRAME);
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) energy = %f, silence ms = %d, zero crossings = %d\n", vad->time_ms, vad->energy, vad->transition_frames * AMD_MS_PER_FRAME, vad->zero_crossings);
 		vad->event_handler(SAMD_VAD_VOICE, vad->time_ms, vad->transition_frames * AMD_MS_PER_FRAME, vad->user_event_data);
 	}
 }
@@ -170,11 +172,17 @@ void samd_vad_process_buffer(samd_vad_t *vad, int16_t *samples, uint32_t num_sam
 		vad->energy += abs(samples[i]);
 		vad->samples++;
 		vad->total_samples++;
+		//if ((vad->last_sample < 0 && samples[i] > 0) || (vad->last_sample > 0 && samples[i] < 0)) {
+		if (vad->last_sample < 0 && samples[i] >= 0) {
+			vad->zero_crossings++;
+		}
+		vad->last_sample = samples[i];
 		if (vad->samples >= AMD_SAMPLES_PER_FRAME) {
 			vad->energy = vad->energy / AMD_SAMPLES_PER_FRAME;
 			vad->state(vad, (uint32_t)vad->energy > vad->threshold);
 			vad->energy = 0.0;
 			vad->samples = 0;
+			vad->zero_crossings = 0;
 			vad->time_ms += AMD_MS_PER_FRAME;
 		}
 	}

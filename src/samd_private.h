@@ -47,6 +47,12 @@ struct samd_vad {
 	/** energy detected in current frame */
 	double energy;
 
+	/** last sample processed */
+	int16_t last_sample;
+
+	/** zero crossings in current frame */
+	uint32_t zero_crossings;
+
 	/** time running */
 	uint32_t time_ms;
 
