@@ -9,51 +9,32 @@
 
 #include "simpleamd.h"
 
+#define MS_PER_FRAME 10
+
+typedef struct samd_frame_analyzer samd_frame_analyzer_t;
+
 /** internal VAD state machine function type */
 typedef void (* samd_vad_state_fn)(samd_vad_t *vad, int in_voice);
 
+/** frame analyzer callback function */
+typedef void (* samd_frame_analyzer_cb_fn)(samd_frame_analyzer_t *analyzer, void *user_data, uint32_t time_ms, double energy, uint32_t zero_crossings);
+
 /**
- * VAD state
+ * Frame analysis stats
  */
-struct samd_vad {
-	/** callback for VAD events */
-	samd_vad_event_fn event_handler;
+struct samd_frame_analyzer {
 
-	/** callback for log messages */
-	samd_log_fn log_handler;
-
-	/** energy threshold - values above this are voice slices */
-	double threshold;
-
-	/** duration of voice to trigger transition to voice */
-	uint32_t voice_ms;
-
-	/** duration of silence to trigger transition to silence */
-	uint32_t silence_ms;
+	/** callback for frame data */
+	samd_frame_analyzer_cb_fn callback;
 
 	/** user data to send to callbacks */
-	void *user_event_data;
-
-	/** user data to send to callbacks */
-	void *user_log_data;
-
-	/** current detection state */
-	samd_vad_state_fn state;
+	void *user_cb_data;
 
 	/** energy detected in current frame channels (mono or stereo only) */
 	double energy[2];
 
 	/** total energy observed */
 	double total_energy;
-
-	/** maximum factor to adjust threshold relative to current threshold. */
-	uint32_t threshold_adjust_limit;
-
-	/** time relative to start to adjust energy threshold.  0 to disable. */
-	uint32_t initial_adjust_ms;
-
-	/** time relative to start of voice to adjust energy threshold.  0 to disable. */
-	uint32_t voice_adjust_ms;
 
 	/** normalizes energy calculation over different sample rates */
 	uint32_t downsample_factor;
@@ -73,13 +54,63 @@ struct samd_vad {
 	/** number of samples processed in current frame */
 	uint32_t samples;
 
+	uint32_t samples_per_frame;
+};
+
+/**
+ * VAD state
+ */
+struct samd_vad {
+	/** current frame state */
+	samd_frame_analyzer_t *analyzer;
+
+	/** callback for VAD events */
+	samd_vad_event_fn event_handler;
+
+	/** callback for log messages */
+	samd_log_fn log_handler;
+
+	/** time running */
+	uint32_t time_ms;
+
+	/** energy detected in current frame */
+	double energy;
+
+	/** zero crossings in current frame */
+	uint32_t zero_crossings;
+
+	/** energy threshold - values above this are voice slices */
+	double threshold;
+
+	/** duration of voice to trigger transition to voice */
+	uint32_t voice_ms;
+
+	/** duration of silence to trigger transition to silence */
+	uint32_t silence_ms;
+
+	/** user data to send to callbacks */
+	void *user_event_data;
+
+	/** user data to send to callbacks */
+	void *user_log_data;
+
+	/** current detection state */
+	samd_vad_state_fn state;
+
+	/** maximum factor to adjust threshold relative to current threshold. */
+	uint32_t threshold_adjust_limit;
+
+	/** time relative to start to adjust energy threshold.  0 to disable. */
+	uint32_t initial_adjust_ms;
+
+	/** time relative to start of voice to adjust energy threshold.  0 to disable. */
+	uint32_t voice_adjust_ms;
+
 	/** duration of voice or silence processed prior to transitioning state */
 	uint32_t transition_ms;
 
 	/** Time when first speech heard */
 	uint32_t initial_voice_time_ms;
-
-	uint32_t samples_per_frame;
 };
 
 /** Internal AMD state machine function type */
@@ -128,5 +159,12 @@ struct samd {
  */
 #define samd_log_printf(obj, level, format_string, ...)  _samd_log_printf(obj->log_handler, level, obj->user_log_data, __FILE__, __LINE__, format_string, __VA_ARGS__)
 void _samd_log_printf(samd_log_fn log_handler, samd_log_level_t level, void *user_data, const char *file, int line, const char *format_string, ...);
+
+void samd_frame_analyzer_init(samd_frame_analyzer_t **analyzer);
+void samd_frame_analyzer_set_callback(samd_frame_analyzer_t *analyzer, samd_frame_analyzer_cb_fn cb, void *user_cb_data);
+void samd_frame_analyzer_set_sample_rate(samd_frame_analyzer_t *analyzer, uint32_t sample_rate);
+void samd_frame_analyzer_process_buffer(samd_frame_analyzer_t *analyzer, int16_t *samples, uint32_t num_samples, uint32_t channels);
+double samd_frame_analyzer_get_average_energy(samd_frame_analyzer_t *analyzer);
+void samd_frame_analyzer_destroy(samd_frame_analyzer_t **analyzer);
 
 #endif
