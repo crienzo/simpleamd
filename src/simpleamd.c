@@ -24,23 +24,23 @@ int vad_initial_adjust_ms = 100;
 int vad_voice_adjust_ms = 50;
 int vad_adjust_limit = 3;
 
-static const char *result_string[4] = { "unknown", "human", "machine", "dead-air" };
+static const char *result_string[4] = { "unknown", "human", "machine", "no-voice" };
 enum amd_test_result {
 	RESULT_UNKNOWN = 0,
 	RESULT_HUMAN,
 	RESULT_MACHINE,
-	RESULT_DEAD_AIR
+	RESULT_NO_VOICE
 };
 
 struct amd_test_stats {
 	int humans;
 	int humans_detected_as_machine;
 	int humans_detected_as_unknown;
-	int humans_detected_as_dead_air;
+	int humans_detected_as_no_voice;
 	int machines;
 	int machines_detected_as_human;
 	int machines_detected_as_unknown;
-	int machines_detected_as_dead_air;
+	int machines_detected_as_no_voice;
 };
 
 static void amd_logger(samd_log_level_t level, void *user_log_data, const char *file, int line, const char *message)
@@ -51,12 +51,12 @@ static void amd_logger(samd_log_level_t level, void *user_log_data, const char *
 static void amd_event_handler(samd_event_t event, uint32_t time_ms, void *user_event_data)
 {
 	enum amd_test_result *result = (enum amd_test_result *)user_event_data;
-	if (event == SAMD_MACHINE_VOICE || event == SAMD_MACHINE_SILENCE) {
+	if (event == SAMD_MACHINE_VOICE || event == SAMD_MACHINE_SILENCE || event == SAMD_MACHINE_BEEP) {
 		*result = RESULT_MACHINE;
 	} else if (event == SAMD_HUMAN_SILENCE || event == SAMD_HUMAN_VOICE) {
 		*result = RESULT_HUMAN;
-	} else if (event == SAMD_DEAD_AIR) {
-		*result = RESULT_DEAD_AIR;
+	} else if (event == SAMD_NO_VOICE) {
+		*result = RESULT_NO_VOICE;
 	}
 }
 
@@ -78,33 +78,28 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 	int16_t samples[80] = { 0 };
 	enum amd_test_result result = RESULT_UNKNOWN;
 
-	samd_vad_init(&vad);
-	if (!vad) {
-		fprintf(stderr, "Failed to initialize AMD VAD\n");
-		exit(EXIT_FAILURE);
-	}
-	samd_vad_set_sample_rate(vad, vad_sample_rate);
-	samd_vad_set_energy_threshold(vad, vad_energy_threshold); /* energy above this threshold is considered voice */
-	samd_vad_set_silence_ms(vad, vad_silence_ms); /* how long to wait for end of voice */
-	samd_vad_set_voice_ms(vad, vad_voice_ms); /* how long to wait for start of voice */
-	samd_vad_set_initial_adjust_ms(vad, vad_initial_adjust_ms); /* time to adjust energy threshold relative to start */
-	samd_vad_set_voice_adjust_ms(vad, vad_voice_adjust_ms); /* time to adjust energy threshold relative to start of voice */
-	samd_vad_set_adjust_limit(vad, vad_adjust_limit);
-	if (debug) {
-		samd_vad_set_log_handler(vad, amd_logger, (void *)raw_audio_file_name);
-	}
-
-	samd_init(&amd, vad);
+	/* create AMD */
+	samd_init(&amd);
 	if (!amd) {
 		fprintf(stderr, "Failed to initialize AMD\n");
 		exit(EXIT_FAILURE);
 	}
+	samd_set_sample_rate(amd, vad_sample_rate);
 	samd_set_machine_ms(amd, amd_machine_ms); /* voice longer than this is classified machine */
 	samd_set_silence_start_ms(amd, amd_silence_ms); /* maximum duration of initial silence to allow */
 	samd_set_event_handler(amd, amd_event_handler, &result);
 	if (debug) {
 		samd_set_log_handler(amd, amd_logger, (void *)raw_audio_file_name);
 	}
+
+	/* configure VAD for AMD */
+	vad = samd_get_vad(amd);
+	samd_vad_set_energy_threshold(vad, vad_energy_threshold); /* energy above this threshold is considered voice */
+	samd_vad_set_silence_ms(vad, vad_silence_ms); /* how long to wait for end of voice */
+	samd_vad_set_voice_ms(vad, vad_voice_ms); /* how long to wait for start of voice */
+	samd_vad_set_initial_adjust_ms(vad, vad_initial_adjust_ms); /* time to adjust energy threshold relative to start */
+	samd_vad_set_voice_adjust_ms(vad, vad_voice_adjust_ms); /* time to adjust energy threshold relative to start of voice */
+	samd_vad_set_adjust_limit(vad, vad_adjust_limit);
 
 	raw_audio_file = fopen(raw_audio_file_name, "rb");
 	if (!raw_audio_file) {
@@ -121,14 +116,13 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 
 	fclose(raw_audio_file);
 	samd_destroy(&amd);
-	samd_vad_destroy(&vad);
 
 	if (expected_result == RESULT_MACHINE) {
 		test_stats->machines++;
 		switch (result) {
 			case RESULT_UNKNOWN: test_stats->machines_detected_as_unknown++; break;
 			case RESULT_HUMAN: test_stats->machines_detected_as_human++; break;
-			case RESULT_DEAD_AIR: test_stats->machines_detected_as_dead_air++; break;
+			case RESULT_NO_VOICE: test_stats->machines_detected_as_no_voice++; break;
 			default: break;
 		}
 	} else if (expected_result == RESULT_HUMAN) {
@@ -136,7 +130,7 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 		switch (result) {
 			case RESULT_UNKNOWN: test_stats->humans_detected_as_unknown++; break;
 			case RESULT_MACHINE: test_stats->humans_detected_as_machine++; break;
-			case RESULT_DEAD_AIR: test_stats->humans_detected_as_dead_air++; break;
+			case RESULT_NO_VOICE: test_stats->humans_detected_as_no_voice++; break;
 			default: break;
 		}
 	}
@@ -332,8 +326,8 @@ int main(int argc, char **argv)
 			double human_detection_accuracy = ((double)detected_humans / (double)test_stats.humans) * 100.0;
 			printf("human,%d,%d,%d,%d,%0.2f\n",
 				test_stats.humans_detected_as_machine,
-				detected_humans - test_stats.humans_detected_as_dead_air,
-				test_stats.humans_detected_as_dead_air,
+				detected_humans - test_stats.humans_detected_as_no_voice,
+				test_stats.humans_detected_as_no_voice,
 				test_stats.humans_detected_as_unknown,
 				human_detection_accuracy);
 
@@ -342,13 +336,13 @@ int main(int argc, char **argv)
 		}
 
 		if (test_stats.machines > 0) {
-			int detected_machines = test_stats.machines - test_stats.machines_detected_as_dead_air -
+			int detected_machines = test_stats.machines - test_stats.machines_detected_as_no_voice -
 				test_stats.machines_detected_as_human - test_stats.machines_detected_as_unknown;
 			double machine_detection_accuracy = ((double)detected_machines / (double)test_stats.machines) * 100.0;
 			printf("machine,%d,%d,%d,%d,%0.2f\n",
 				detected_machines,
 				test_stats.machines_detected_as_human,
-				test_stats.machines_detected_as_dead_air,
+				test_stats.machines_detected_as_no_voice,
 				test_stats.machines_detected_as_unknown,
 				machine_detection_accuracy);
 

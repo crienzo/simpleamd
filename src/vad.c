@@ -141,7 +141,7 @@ static void vad_threshold_adjust(samd_vad_t *vad)
  * @param analzyer the frame analyzer
  * @param user_data this VAD
  */
-static void process_frame(samd_frame_analyzer_t *analyzer, void *user_data, uint32_t time_ms, double energy, uint32_t zero_crossings)
+void samd_vad_process_frame(samd_frame_analyzer_t *analyzer, void *user_data, uint32_t time_ms, double energy, uint32_t zero_crossings)
 {
 	samd_vad_t *vad = (samd_vad_t *)user_data;
 	vad->time_ms = time_ms;
@@ -170,20 +170,19 @@ void samd_vad_process_buffer(samd_vad_t *vad, int16_t *samples, uint32_t num_sam
 }
 
 /**
- * Create the VAD
+ * Create the VAD w/o frame analyzer
  *
  * @param vad to initialize - free with samd_vad_destroy()
  * @param event_handler - callback function when VAD events are detected
  * @param user_data to send to callback functions
  */
-void samd_vad_init(samd_vad_t **vad)
+void samd_vad_init_internal(samd_vad_t **vad)
 {
 	samd_vad_t *new_vad = (samd_vad_t *)malloc(sizeof(*new_vad));
 	samd_vad_set_log_handler(new_vad, null_log_handler, NULL);
 	samd_vad_set_event_handler(new_vad, null_event_handler, NULL);
 
-	samd_frame_analyzer_init(&new_vad->analyzer);
-	samd_frame_analyzer_set_callback(new_vad->analyzer, process_frame, new_vad);
+	new_vad->analyzer = NULL;
 
 	/* reset detection state */
 	new_vad->time_ms = 0;
@@ -198,6 +197,24 @@ void samd_vad_init(samd_vad_t **vad)
 	samd_vad_set_initial_adjust_ms(new_vad, VAD_DEFAULT_INITIAL_ADJUST_MS);
 	samd_vad_set_voice_adjust_ms(new_vad, VAD_DEFAULT_VOICE_ADJUST_MS);
 	samd_vad_set_adjust_limit(new_vad, VAD_DEFAULT_THRESHOLD_ADJUST_LIMIT);
+
+	*vad = new_vad;
+}
+
+/**
+ * Create the standalone VAD
+ *
+ * @param vad to initialize - free with samd_vad_destroy()
+ * @param event_handler - callback function when VAD events are detected
+ * @param user_data to send to callback functions
+ */
+void samd_vad_init(samd_vad_t **vad)
+{
+	samd_vad_t *new_vad;
+	samd_vad_init_internal(&new_vad);
+
+	samd_frame_analyzer_init(&new_vad->analyzer);
+	samd_frame_analyzer_set_callback(new_vad->analyzer, samd_vad_process_frame, new_vad);
 
 	*vad = new_vad;
 }

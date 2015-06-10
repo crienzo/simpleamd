@@ -114,14 +114,44 @@ struct samd_vad {
 };
 
 /** Internal AMD state machine function type */
-typedef void (* samd_state_fn)(samd_t *amd, samd_vad_event_t event);
+typedef void (* samd_state_fn)(samd_t *amd, samd_vad_event_t event, int beep);
+
+
+/**
+ * Beep state
+ */
+struct samd_beep {
+	/** current frame state */
+	samd_frame_analyzer_t *analyzer;
+
+	/** time running */
+	uint32_t time_ms;
+
+	/** callback for VAD events */
+	samd_beep_event_fn event_handler;
+
+	/** callback for log messages */
+	samd_log_fn log_handler;
+
+	/** user data to send to callbacks */
+	void *user_event_data;
+
+	/** user data to send to callbacks */
+	void *user_log_data;
+};
 
 /**
  * AMD state
  */
 struct samd {
+	/** audio frame analyzer */
+	samd_frame_analyzer_t *analyzer;
+
 	/** voice activity detector */
 	samd_vad_t *vad;
+
+	/** beep detector */
+	samd_beep_t *beep;
 
 	/** time running */
 	uint32_t time_ms;
@@ -166,5 +196,11 @@ void samd_frame_analyzer_set_sample_rate(samd_frame_analyzer_t *analyzer, uint32
 void samd_frame_analyzer_process_buffer(samd_frame_analyzer_t *analyzer, int16_t *samples, uint32_t num_samples, uint32_t channels);
 double samd_frame_analyzer_get_average_energy(samd_frame_analyzer_t *analyzer);
 void samd_frame_analyzer_destroy(samd_frame_analyzer_t **analyzer);
+
+void samd_vad_init_internal(samd_vad_t **vad);
+void samd_vad_process_frame(samd_frame_analyzer_t *analyzer, void *user_data, uint32_t time_ms, double energy, uint32_t zero_crossings);
+
+void samd_beep_init_internal(samd_beep_t **beep);
+void samd_beep_process_frame(samd_frame_analyzer_t *analyzer, void *user_data, uint32_t time_ms, double energy, uint32_t zero_crossings);
 
 #endif
