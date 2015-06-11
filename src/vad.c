@@ -123,10 +123,10 @@ void samd_vad_set_adjust_limit(samd_vad_t *vad, uint32_t limit)
 /**
  * Adjust energy threshold based on average energy level.
  */
-static void vad_threshold_adjust(samd_vad_t *vad)
+static void vad_threshold_adjust(samd_vad_t *vad, samd_frame_analyzer_t *analyzer)
 {
-	uint32_t time_ms = vad->analyzer->time_ms;
-	double average_energy = samd_frame_analyzer_get_average_energy(vad->analyzer);
+	uint32_t time_ms = vad->time_ms;
+	double average_energy = samd_frame_analyzer_get_average_energy(analyzer);
 	double new_threshold = fmin(average_energy, vad->threshold * vad->threshold_adjust_limit);
 	if (new_threshold > vad->threshold) {
 		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: increasing threshold %f to %f, average energy = %f\n", time_ms, vad->threshold, new_threshold, average_energy);
@@ -150,7 +150,7 @@ void samd_vad_process_frame(samd_frame_analyzer_t *analyzer, void *user_data, ui
 
 	/* auto adjust threshold for noise if configured */
 	if (vad->time_ms == vad->initial_adjust_ms || (vad->voice_adjust_ms && vad->initial_voice_time_ms && vad->time_ms == vad->voice_adjust_ms + vad->initial_voice_time_ms)) {
-		vad_threshold_adjust(vad);
+		vad_threshold_adjust(vad, analyzer);
 	}
 
 	/* feed state machine */

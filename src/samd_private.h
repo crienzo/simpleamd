@@ -13,8 +13,6 @@
 
 typedef struct samd_frame_analyzer samd_frame_analyzer_t;
 
-/** internal VAD state machine function type */
-typedef void (* samd_vad_state_fn)(samd_vad_t *vad, int in_voice);
 
 /** frame analyzer callback function */
 typedef void (* samd_frame_analyzer_cb_fn)(samd_frame_analyzer_t *analyzer, void *user_data, uint32_t time_ms, double energy, uint32_t zero_crossings);
@@ -56,6 +54,9 @@ struct samd_frame_analyzer {
 
 	uint32_t samples_per_frame;
 };
+
+/** internal VAD state machine function type */
+typedef void (* samd_vad_state_fn)(samd_vad_t *vad, int in_voice);
 
 /**
  * VAD state
@@ -113,9 +114,8 @@ struct samd_vad {
 	uint32_t initial_voice_time_ms;
 };
 
-/** Internal AMD state machine function type */
-typedef void (* samd_state_fn)(samd_t *amd, samd_vad_event_t event, int beep);
-
+/** internal beep state machine function type */
+typedef void (* samd_beep_state_fn)(samd_beep_t *beep, uint32_t time_ms, double energy, uint32_t zero_crossings);
 
 /**
  * Beep state
@@ -124,8 +124,32 @@ struct samd_beep {
 	/** current frame state */
 	samd_frame_analyzer_t *analyzer;
 
+	/** current detection state */
+	samd_beep_state_fn state;
+
 	/** time running */
 	uint32_t time_ms;
+
+	/** time of potential beep start */
+	uint32_t start_time;
+
+	/** count of potential beep zero crossings */
+	uint16_t beep_zero_crossings;
+
+	/** count of non-beep zero crossings */
+	uint16_t other_zero_crossings;
+
+	/** largest zero crossings observed during potential beep */
+	uint32_t max_zero_crossings;
+
+	/** smallest zero crossings observed during potential beep */
+	uint32_t min_zero_crossings;
+
+	/** maximum energy observed during potential beep */
+	double max_energy;
+
+	/** minimum energy observed during potential beep */
+	double min_energy;
 
 	/** callback for VAD events */
 	samd_beep_event_fn event_handler;
@@ -139,6 +163,9 @@ struct samd_beep {
 	/** user data to send to callbacks */
 	void *user_log_data;
 };
+
+/** Internal AMD state machine function type */
+typedef void (* samd_state_fn)(samd_t *amd, samd_vad_event_t event, int beep);
 
 /**
  * AMD state

@@ -62,7 +62,7 @@ static void amd_event_handler(samd_event_t event, uint32_t time_ms, void *user_e
 
 static enum amd_test_result get_expected_result_from_audio_file_name(const char *raw_audio_file_name)
 {
-	if (strcasestr(raw_audio_file_name, "machine")) {
+	if (strcasestr(raw_audio_file_name, "machine") || strcasestr(raw_audio_file_name, "beep")) {
 		return RESULT_MACHINE;
 	} else if (strcasestr(raw_audio_file_name, "human") || strcasestr(raw_audio_file_name, "person")) {
 		return RESULT_HUMAN;

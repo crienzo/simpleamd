@@ -11,6 +11,7 @@
 #define SAMPLES_PER_FRAME_DIVISOR 100
 #define INTERNAL_SAMPLE_RATE 8000
 
+
 /**
  * Set the sample rate of the audio
  * @param frame_analyzer
