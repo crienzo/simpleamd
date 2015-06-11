@@ -154,7 +154,7 @@ void samd_vad_process_frame(samd_frame_analyzer_t *analyzer, void *user_data, ui
 	}
 
 	/* use really high energy threshold if sensing background noise levels has not completed */
-	if ((vad->time_ms > vad->initial_adjust_ms && energy > vad->threshold) || energy > vad->threshold * 10.0) {
+	if ((vad->time_ms > vad->initial_adjust_ms && energy > vad->threshold) || energy > vad->threshold * vad->threshold_adjust_limit) {
 		vad->total_voice_ms += MS_PER_FRAME;
 		vad->state(vad, 1);
 	} else {
