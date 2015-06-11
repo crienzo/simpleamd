@@ -129,7 +129,7 @@ static void vad_threshold_adjust(samd_vad_t *vad, samd_frame_analyzer_t *analyze
 	double average_energy = samd_frame_analyzer_get_average_energy(analyzer);
 	double new_threshold = fmin(average_energy * 3.0, vad->max_threshold);
 	if (new_threshold > vad->threshold) {
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: increasing threshold %f to %f, average energy = %f\n", time_ms, vad->threshold, new_threshold, average_energy);
+		samd_log_printf(vad, SAMD_LOG_INFO, "%d: increasing threshold %f to %f, average energy = %f\n", time_ms, vad->threshold, new_threshold, average_energy);
 		vad->threshold = new_threshold;
 	} else {
 		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: threshold = %f, average energy = %f\n", time_ms, vad->threshold, average_energy);
@@ -240,7 +240,7 @@ static void vad_state_silence(samd_vad_t *vad, int in_voice)
 	if (vad->transition_ms >= vad->voice_ms) {
 		vad->state = vad_state_voice;
 		vad->transition_ms = 0;
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) VOICE DETECTED, total voice ms = %d\n", vad->time_ms, vad->total_voice_ms);
+		samd_log_printf(vad, SAMD_LOG_INFO, "%d: (silence) VOICE DETECTED, total voice ms = %d\n", vad->time_ms, vad->total_voice_ms);
 		if (vad->initial_voice_time_ms == 0) {
 			vad->initial_voice_time_ms = vad->time_ms;
 		}
@@ -267,7 +267,7 @@ static void vad_state_voice(samd_vad_t *vad, int in_voice)
 	if (vad->transition_ms >= vad->voice_end_ms) {
 		vad->state = vad_state_silence;
 		vad->transition_ms = 0;
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) SILENCE DETECTED, total voice ms = %d\n", vad->time_ms, vad->total_voice_ms);
+		samd_log_printf(vad, SAMD_LOG_INFO, "%d: (voice) SILENCE DETECTED, total voice ms = %d\n", vad->time_ms, vad->total_voice_ms);
 		vad->event_handler(SAMD_VAD_SILENCE_BEGIN, vad->time_ms, vad->total_voice_ms, 0, vad->user_event_data);
 	} else {
 		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) energy = %f, silence ms = %d, zero crossings = %d, total voice ms = %d\n", vad->time_ms, vad->energy, vad->transition_ms, vad->zero_crossings, vad->total_voice_ms);

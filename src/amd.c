@@ -39,7 +39,7 @@ static void null_event_handler(samd_event_t event, uint32_t samples, void *user_
 static void amd_state_wait_for_voice(samd_t *amd, samd_vad_event_t event, int beep)
 {
 	if (beep) {
-		samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: BEEP, transition to MACHINE DETECTED\n", amd->time_ms);
+		samd_log_printf(amd, SAMD_LOG_INFO, "%d: BEEP, transition to MACHINE DETECTED\n", amd->time_ms);
 		amd->state_begin_ms = amd->time_ms;
 		amd->state = amd_state_machine_detected;
 		amd->event_handler(SAMD_MACHINE_BEEP, amd->time_ms, amd->user_event_data);
@@ -50,7 +50,7 @@ static void amd_state_wait_for_voice(samd_t *amd, samd_vad_event_t event, int be
 		case SAMD_VAD_SILENCE_BEGIN:
 		case SAMD_VAD_SILENCE:
 			if (amd->time_ms - amd->state_begin_ms >= amd->wait_for_voice_ms) {
-				samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: NO VOICE, transition to DONE\n", amd->time_ms);
+				samd_log_printf(amd, SAMD_LOG_INFO, "%d: NO VOICE, transition to DONE\n", amd->time_ms);
 				amd->state_begin_ms = amd->time_ms;
 				amd->state = amd_state_done;
 				amd->event_handler(SAMD_NO_VOICE, amd->time_ms, amd->user_event_data);
@@ -58,7 +58,7 @@ static void amd_state_wait_for_voice(samd_t *amd, samd_vad_event_t event, int be
 			break;
 		case SAMD_VAD_VOICE_BEGIN:
 		case SAMD_VAD_VOICE:
-			samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: Start of VOICE, transition to DETECT\n", amd->time_ms);
+			samd_log_printf(amd, SAMD_LOG_INFO, "%d: Start of VOICE, transition to DETECT\n", amd->time_ms);
 			amd->state_begin_ms = amd->time_ms;
 			amd->state = amd_state_detect;
 			break;
@@ -74,7 +74,7 @@ static void amd_state_wait_for_voice(samd_t *amd, samd_vad_event_t event, int be
 static void amd_state_detect(samd_t *amd, samd_vad_event_t event, int beep)
 {
 	if (beep) {
-		samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: BEEP, transition to MACHINE DETECTED\n", amd->time_ms);
+		samd_log_printf(amd, SAMD_LOG_INFO, "%d: BEEP, transition to MACHINE DETECTED\n", amd->time_ms);
 		amd->state_begin_ms = amd->time_ms;
 		amd->state = amd_state_machine_detected;
 		amd->event_handler(SAMD_MACHINE_BEEP, amd->time_ms, amd->user_event_data);
@@ -86,7 +86,7 @@ static void amd_state_detect(samd_t *amd, samd_vad_event_t event, int beep)
 			break;
 		case SAMD_VAD_SILENCE_BEGIN:
 		case SAMD_VAD_SILENCE:
-			samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: SILENCE, total voice ms = %d, transition to HUMAN DETECTED\n", amd->time_ms, amd->total_voice_ms);
+			samd_log_printf(amd, SAMD_LOG_INFO, "%d: SILENCE, total voice ms = %d, transition to HUMAN DETECTED\n", amd->time_ms, amd->total_voice_ms);
 			amd->state_begin_ms = amd->time_ms;
 			amd->state = amd_state_human_detected;
 			amd->event_handler(SAMD_HUMAN_SILENCE, amd->time_ms, amd->user_event_data);
@@ -95,7 +95,7 @@ static void amd_state_detect(samd_t *amd, samd_vad_event_t event, int beep)
 		case SAMD_VAD_VOICE:
 			/* calculate time in voice minus any current silence (transition ms) we are hearing */
 			if (amd->time_ms - amd->state_begin_ms - amd->transition_ms >= amd->machine_ms) {
-				samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: total voice ms = %d, Exceeded machine_ms, transition to MACHINE DETECTED\n", amd->time_ms, amd->total_voice_ms, amd->total_voice_ms);
+				samd_log_printf(amd, SAMD_LOG_INFO, "%d: total voice ms = %d, Exceeded machine_ms, transition to MACHINE DETECTED\n", amd->time_ms, amd->total_voice_ms, amd->total_voice_ms);
 				amd->state_begin_ms = amd->time_ms;
 				amd->state = amd_state_machine_detected;
 				amd->event_handler(SAMD_MACHINE_VOICE, amd->time_ms, amd->user_event_data);
@@ -113,7 +113,7 @@ static void amd_state_detect(samd_t *amd, samd_vad_event_t event, int beep)
 static void amd_state_human_detected(samd_t *amd, samd_vad_event_t event, int beep)
 {
 	if (beep) {
-		samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: BEEP, transition to MACHINE DETECTED\n", amd->time_ms);
+		samd_log_printf(amd, SAMD_LOG_INFO, "%d: BEEP, transition to MACHINE DETECTED\n", amd->time_ms);
 		amd->state_begin_ms = amd->time_ms;
 		amd->state = amd_state_machine_detected;
 		amd->event_handler(SAMD_MACHINE_BEEP, amd->time_ms, amd->user_event_data);

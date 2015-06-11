@@ -155,7 +155,7 @@ static void beep_state_collect(samd_beep_t *beep, uint32_t time_ms, double energ
 					zero_crossings, beep->min_zero_crossings, beep->max_zero_crossings, duration,
 					beep->beep_zero_crossings, beep->other_zero_crossings, pct_good);
 		if (duration >= 100 && pct_good > 90.0 && regularity <= 1) {
-			samd_log_printf(beep, SAMD_LOG_DEBUG, "%d: POTENTIAL BEEP DETECTED\n", time_ms);
+			samd_log_printf(beep, SAMD_LOG_INFO, "%d: POTENTIAL BEEP DETECTED\n", time_ms);
 			beep->state = beep_state_wait_for_end;
 			beep->start_time = time_ms; /* start counting time from here */
 		} else {
@@ -170,7 +170,7 @@ static void beep_state_wait_for_end(samd_beep_t *beep, uint32_t time_ms, double 
 	/* allow beep to ramp down, then must be silent for threshold */
 	if (energy < beep->min_energy * 0.6 || energy < 200) {
 		if (time_ms - beep->start_time >= 200) {
-			samd_log_printf(beep, SAMD_LOG_DEBUG, "%d: (end) BEEP DETECTED\n", time_ms);
+			samd_log_printf(beep, SAMD_LOG_INFO, "%d: (end) BEEP DETECTED\n", time_ms);
 			beep->event_handler(time_ms, beep->user_event_data);
 			beep_reset(beep);
 			beep->state = beep_state_done;
@@ -180,7 +180,7 @@ static void beep_state_wait_for_end(samd_beep_t *beep, uint32_t time_ms, double 
 		}
 	} else {
 		/* not a beep */
-		samd_log_printf(beep, SAMD_LOG_DEBUG, "%d: (end) NOT A BEEP, energy = %f\n", time_ms, energy);
+		samd_log_printf(beep, SAMD_LOG_INFO, "%d: (end) NOT A BEEP, energy = %f\n", time_ms, energy);
 		beep_reset(beep);
 		beep->state = beep_state_wait_for_start;
 	}
