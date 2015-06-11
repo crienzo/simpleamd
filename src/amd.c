@@ -86,7 +86,7 @@ static void amd_state_detect(samd_t *amd, samd_vad_event_t event, int beep)
 			break;
 		case SAMD_VAD_SILENCE_BEGIN:
 		case SAMD_VAD_SILENCE:
-			samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: SILENCE, transition to HUMAN DETECTED\n", amd->time_ms);
+			samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: SILENCE, total voice ms = %d, transition to HUMAN DETECTED\n", amd->time_ms, amd->total_voice_ms);
 			amd->state_begin_ms = amd->time_ms;
 			amd->state = amd_state_human_detected;
 			amd->event_handler(SAMD_HUMAN_SILENCE, amd->time_ms, amd->user_event_data);
@@ -95,7 +95,7 @@ static void amd_state_detect(samd_t *amd, samd_vad_event_t event, int beep)
 		case SAMD_VAD_VOICE:
 			/* calculate time in voice minus any current silence (transition ms) we are hearing */
 			if (amd->time_ms - amd->state_begin_ms - amd->transition_ms >= amd->machine_ms) {
-				samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: Exceeded machine_ms, transition to MACHINE DETECTED\n", amd->time_ms);
+				samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: total voice ms = %d, Exceeded machine_ms, transition to MACHINE DETECTED\n", amd->time_ms, amd->total_voice_ms, amd->total_voice_ms);
 				amd->state_begin_ms = amd->time_ms;
 				amd->state = amd_state_machine_detected;
 				amd->event_handler(SAMD_MACHINE_VOICE, amd->time_ms, amd->user_event_data);
@@ -191,14 +191,16 @@ void samd_set_machine_ms(samd_t *amd, uint32_t ms)
  * Process VAD events
  * @param event VAD event
  * @param time_ms time this event occurred, relative to start of detector
+ * @param total_voice_ms how much voice has been heard in total
  * @param transition_ms duration spent in voice/silence while in opposite state
  * @param user_event_data the AMD
  */
-static void vad_event_handler(samd_vad_event_t event, uint32_t time_ms, uint32_t transition_ms, void *user_event_data)
+static void vad_event_handler(samd_vad_event_t event, uint32_t time_ms, uint32_t total_voice_ms, uint32_t transition_ms, void *user_event_data)
 {
 	/* forward event to state machine */
 	samd_t *amd = (samd_t *)user_event_data;
 	amd->time_ms = time_ms;
+	amd->total_voice_ms = total_voice_ms;
 	amd->transition_ms = transition_ms;
 	amd->state(amd, event, 0);
 }

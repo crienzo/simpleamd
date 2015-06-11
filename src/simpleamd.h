@@ -48,7 +48,7 @@ typedef enum samd_vad_event {
 
 typedef struct samd_vad samd_vad_t;
 
-typedef void (* samd_vad_event_fn)(samd_vad_event_t event, uint32_t time_ms, uint32_t transition_ms, void *user_event_data);
+typedef void (* samd_vad_event_fn)(samd_vad_event_t event, uint32_t time_ms, uint32_t total_voice_ms, uint32_t transition_ms, void *user_event_data);
 
 void samd_vad_init(samd_vad_t **vad);
 void samd_vad_set_log_handler(samd_vad_t *vad, samd_log_fn log_handler, void *user_log_data);

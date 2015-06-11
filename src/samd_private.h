@@ -74,6 +74,9 @@ struct samd_vad {
 	/** time running */
 	uint32_t time_ms;
 
+	/** total voice ms heard */
+	uint32_t total_voice_ms;
+
 	/** energy detected in current frame */
 	double energy;
 
@@ -182,6 +185,9 @@ struct samd {
 
 	/** time running */
 	uint32_t time_ms;
+
+	/** total voice ms heard */
+	uint32_t total_voice_ms;
 
 	/** time spent in voice/silence while in opposite VAD state (e.g consecutive voice while in silence state) */
 	uint32_t transition_ms;

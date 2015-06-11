@@ -29,7 +29,7 @@ static void null_log_handler(samd_log_level_t level, void *user_data, const char
 /**
  * NO-OP VAD event handler
  */
-static void null_event_handler(samd_vad_event_t event, uint32_t time_ms, uint32_t transition_ms, void *user_data)
+static void null_event_handler(samd_vad_event_t event, uint32_t time_ms, uint32_t total_voice_ms, uint32_t transition_ms, void *user_data)
 {
 	/* ignore */
 }
@@ -153,8 +153,12 @@ void samd_vad_process_frame(samd_frame_analyzer_t *analyzer, void *user_data, ui
 		vad_threshold_adjust(vad, analyzer);
 	}
 
-	/* feed state machine */
-	vad->state(vad, energy > vad->threshold);
+	if (energy > vad->threshold) {
+		vad->total_voice_ms += MS_PER_FRAME;
+		vad->state(vad, 1);
+	} else {
+		vad->state(vad, 0);
+	}
 }
 
 /**
@@ -189,6 +193,7 @@ void samd_vad_init_internal(samd_vad_t **vad)
 	new_vad->state = vad_state_silence;
 	new_vad->transition_ms = 0;
 	new_vad->initial_voice_time_ms = 0;
+	new_vad->total_voice_ms = 0;
 
 	/* set detection defaults */
 	samd_vad_set_energy_threshold(new_vad, VAD_DEFAULT_ENERGY_THRESHOLD);
@@ -234,14 +239,14 @@ static void vad_state_silence(samd_vad_t *vad, int in_voice)
 	if (vad->transition_ms >= vad->voice_ms) {
 		vad->state = vad_state_voice;
 		vad->transition_ms = 0;
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) VOICE DETECTED\n", vad->time_ms);
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) VOICE DETECTED, total voice ms = %d\n", vad->time_ms, vad->total_voice_ms);
 		if (vad->initial_voice_time_ms == 0) {
 			vad->initial_voice_time_ms = vad->time_ms;
 		}
-		vad->event_handler(SAMD_VAD_VOICE_BEGIN, vad->time_ms, 0, vad->user_event_data);
+		vad->event_handler(SAMD_VAD_VOICE_BEGIN, vad->time_ms, vad->total_voice_ms, 0, vad->user_event_data);
 	} else {
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) energy = %f, voice ms = %d, zero crossings = %d\n", vad->time_ms, vad->energy, vad->transition_ms, vad->zero_crossings);
-		vad->event_handler(SAMD_VAD_SILENCE, vad->time_ms, vad->transition_ms, vad->user_event_data);
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) energy = %f, voice ms = %d, zero crossings = %d, total voice ms = %d\n", vad->time_ms, vad->energy, vad->transition_ms, vad->zero_crossings, vad->total_voice_ms);
+		vad->event_handler(SAMD_VAD_SILENCE, vad->time_ms, vad->total_voice_ms, vad->transition_ms, vad->user_event_data);
 	}
 }
 
@@ -261,11 +266,11 @@ static void vad_state_voice(samd_vad_t *vad, int in_voice)
 	if (vad->transition_ms >= vad->silence_ms) {
 		vad->state = vad_state_silence;
 		vad->transition_ms = 0;
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) SILENCE DETECTED\n", vad->time_ms);
-		vad->event_handler(SAMD_VAD_SILENCE_BEGIN, vad->time_ms, 0, vad->user_event_data);
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) SILENCE DETECTED, total voice ms = %d\n", vad->time_ms, vad->total_voice_ms);
+		vad->event_handler(SAMD_VAD_SILENCE_BEGIN, vad->time_ms, vad->total_voice_ms, 0, vad->user_event_data);
 	} else {
-		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) energy = %f, silence ms = %d, zero crossings = %d\n", vad->time_ms, vad->energy, vad->transition_ms, vad->zero_crossings);
-		vad->event_handler(SAMD_VAD_VOICE, vad->time_ms, vad->transition_ms, vad->user_event_data);
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) energy = %f, silence ms = %d, zero crossings = %d, total voice ms = %d\n", vad->time_ms, vad->energy, vad->transition_ms, vad->zero_crossings, vad->total_voice_ms);
+		vad->event_handler(SAMD_VAD_VOICE, vad->time_ms, vad->total_voice_ms, vad->transition_ms, vad->user_event_data);
 	}
 }
 
