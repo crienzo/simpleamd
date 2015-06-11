@@ -1,7 +1,7 @@
 simpleamd : Simple Answering Machine Detector
 
-An answering machine detector that uses a simple energy-based voice activity detector.
-This detector assumes 8000 kHz, mono, PCM samples.
+An answering machine detection library that uses a simple energy-based voice activity detector.
+This detector accepts 16-bit signed little-endian PCM samples.
 
 To build:
 
@@ -9,4 +9,7 @@ To build:
 ./configure
 make
 make install
+
+
+See simpleamd.c for an example of use.
 
