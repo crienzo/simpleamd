@@ -55,11 +55,11 @@ void samd_vad_set_log_handler(samd_vad_t *vad, samd_log_fn log_handler, void *us
 void samd_vad_set_event_handler(samd_vad_t *vad, samd_vad_event_fn event_handler, void *user_event_data);
 void samd_vad_set_sample_rate(samd_vad_t *vad, uint32_t sample_rate);
 void samd_vad_set_energy_threshold(samd_vad_t *vad, double energy_threshold);
-void samd_vad_set_voice_ms(samd_vad_t *vad, uint32_t ms);
-void samd_vad_set_silence_ms(samd_vad_t *vad, uint32_t ms);
+void samd_vad_set_max_energy_threshold(samd_vad_t *vad, double max_energy_threshold);
 void samd_vad_set_initial_adjust_ms(samd_vad_t *vad, uint32_t ms);
 void samd_vad_set_voice_adjust_ms(samd_vad_t *vad, uint32_t ms);
-void samd_vad_set_adjust_limit(samd_vad_t *vad, uint32_t limit);
+void samd_vad_set_voice_ms(samd_vad_t *vad, uint32_t ms);
+void samd_vad_set_voice_end_ms(samd_vad_t *vad, uint32_t ms);
 void samd_vad_process_buffer(samd_vad_t *vad, int16_t *samples, uint32_t num_samples, uint32_t channels);
 void samd_vad_destroy(samd_vad_t **vad);
 const char *samd_vad_event_to_string(samd_vad_event_t event);
@@ -94,7 +94,7 @@ typedef void (* samd_event_fn)(samd_event_t event, uint32_t samples, void *user_
 void samd_init(samd_t **amd);
 samd_vad_t *samd_get_vad(samd_t *amd);
 samd_beep_t *samd_get_beep(samd_t *beep);
-void samd_set_silence_start_ms(samd_t *amd, uint32_t ms);
+void samd_set_wait_for_voice_ms(samd_t *amd, uint32_t ms);
 void samd_set_machine_ms(samd_t *amd, uint32_t ms);
 void samd_set_log_handler(samd_t *amd, samd_log_fn log_handler, void *user_log_data);
 void samd_set_event_handler(samd_t *amd, samd_event_fn event_handler, void *user_event_data);

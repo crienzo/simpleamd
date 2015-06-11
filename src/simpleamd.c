@@ -13,16 +13,16 @@
 
 int debug = 0;
 int summarize = 0;
-int amd_silence_ms = 2000;
+int amd_wait_for_voice_ms = 2000;
 int amd_machine_ms = 1300;
 double vad_energy_threshold = 130.0;
+double vad_max_energy_threshold = 1300.0;
 int vad_voice_ms = 60;
-int vad_silence_ms = 850;
+int vad_voice_end_ms = 850;
 int vad_sample_rate = 8000;
 int vad_channels = 1;
 int vad_initial_adjust_ms = 200;
 int vad_voice_adjust_ms = 0;
-int vad_adjust_limit = 10;
 
 static const char *result_string[4] = { "unknown", "human", "machine", "no-voice" };
 enum amd_test_result {
@@ -87,7 +87,7 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 	}
 	samd_set_sample_rate(amd, vad_sample_rate);
 	samd_set_machine_ms(amd, amd_machine_ms); /* voice longer than this is classified machine */
-	samd_set_silence_start_ms(amd, amd_silence_ms); /* maximum duration of initial silence to allow */
+	samd_set_wait_for_voice_ms(amd, amd_wait_for_voice_ms); /* maximum duration of initial silence to allow */
 	samd_set_event_handler(amd, amd_event_handler, &result);
 	if (debug) {
 		samd_set_log_handler(amd, amd_logger, (void *)raw_audio_file_name);
@@ -96,11 +96,11 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 	/* configure VAD for AMD */
 	vad = samd_get_vad(amd);
 	samd_vad_set_energy_threshold(vad, vad_energy_threshold); /* energy above this threshold is considered voice */
-	samd_vad_set_silence_ms(vad, vad_silence_ms); /* how long to wait for end of voice */
-	samd_vad_set_voice_ms(vad, vad_voice_ms); /* how long to wait for start of voice */
+	samd_vad_set_max_energy_threshold(vad, vad_max_energy_threshold); /* auto adjustment of energy threshold won't exceed this value */
 	samd_vad_set_initial_adjust_ms(vad, vad_initial_adjust_ms); /* time to adjust energy threshold relative to start */
 	samd_vad_set_voice_adjust_ms(vad, vad_voice_adjust_ms); /* time to adjust energy threshold relative to start of voice */
-	samd_vad_set_adjust_limit(vad, vad_adjust_limit);
+	samd_vad_set_voice_ms(vad, vad_voice_ms); /* how long to wait for start of voice */
+	samd_vad_set_voice_end_ms(vad, vad_voice_end_ms); /* how long to wait for end of voice */
 
 	raw_audio_file = fopen(raw_audio_file_name, "rb");
 	if (!raw_audio_file) {
@@ -198,9 +198,9 @@ int main(int argc, char **argv)
 			case 's': {
 				int val = atoi(optarg);
 				if (val > 0) {
-					vad_silence_ms = val;
+					vad_voice_end_ms = val;
 				} else {
-					fprintf(stderr, "option -s (vad silence ms) must be > 0\n");
+					fprintf(stderr, "option -s (vad voice end ms) must be > 0\n");
 					exit(EXIT_FAILURE);
 				}
 				break;
@@ -226,11 +226,11 @@ int main(int argc, char **argv)
 				break;
 			}
 			case 'a': {
-				int val = atoi(optarg);
-				if (val > 0) {
-					vad_adjust_limit = val;
+				double val = atof(optarg);
+				if (val > 0.0 && val < 32767.0) {
+					vad_max_energy_threshold = val;
 				} else {
-					fprintf(stderr, "option -a (vad adjust limit) must be > 0\n");
+					fprintf(stderr, "option -e (vad max energy threshold) must be > 0 and < 32767\n");
 					exit(EXIT_FAILURE);
 				}
 				break;
@@ -267,7 +267,7 @@ int main(int argc, char **argv)
 			case 'w': {
 				int val = atoi(optarg);
 				if (val > 0) {
-					amd_silence_ms = val;
+					amd_wait_for_voice_ms = val;
 				} else {
 					fprintf(stderr, "option -w (amd wait for voice ms) must be > 0\n");
 					exit(EXIT_FAILURE);

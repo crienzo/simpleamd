@@ -86,11 +86,14 @@ struct samd_vad {
 	/** energy threshold - values above this are voice slices */
 	double threshold;
 
+	/** Maximum energy threshold auto adjust can increase to */
+	double max_threshold;
+
 	/** duration of voice to trigger transition to voice */
 	uint32_t voice_ms;
 
 	/** duration of silence to trigger transition to silence */
-	uint32_t silence_ms;
+	uint32_t voice_end_ms;
 
 	/** user data to send to callbacks */
 	void *user_event_data;
@@ -100,9 +103,6 @@ struct samd_vad {
 
 	/** current detection state */
 	samd_vad_state_fn state;
-
-	/** maximum factor to adjust threshold relative to current threshold. */
-	uint32_t threshold_adjust_limit;
 
 	/** time relative to start to adjust energy threshold.  0 to disable. */
 	uint32_t initial_adjust_ms;
@@ -192,10 +192,10 @@ struct samd {
 	/** time spent in voice/silence while in opposite VAD state (e.g consecutive voice while in silence state) */
 	uint32_t transition_ms;
 
-	/** maximum frames to wait for voice before giving up */
-	uint32_t silence_start_ms;
+	/** maximum time to wait for voice before giving up */
+	uint32_t wait_for_voice_ms;
 
-	/** number of frames that trigger machine detection */
+	/** duration of voice that triggers machine detection */
 	uint32_t machine_ms;
 
 	/** callback for AMD events */

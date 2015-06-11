@@ -49,7 +49,7 @@ static void amd_state_wait_for_voice(samd_t *amd, samd_vad_event_t event, int be
 	switch (event) {
 		case SAMD_VAD_SILENCE_BEGIN:
 		case SAMD_VAD_SILENCE:
-			if (amd->time_ms - amd->state_begin_ms >= amd->silence_start_ms) {
+			if (amd->time_ms - amd->state_begin_ms >= amd->wait_for_voice_ms) {
 				samd_log_printf(amd, SAMD_LOG_DEBUG, "%d: NO VOICE, transition to DONE\n", amd->time_ms);
 				amd->state_begin_ms = amd->time_ms;
 				amd->state = amd_state_done;
@@ -174,9 +174,9 @@ static void amd_state_done(samd_t *amd, samd_vad_event_t event, int beep)
 /**
  * Set the maximum duration in ms the detector will wait for voice to start
  */
-void samd_set_silence_start_ms(samd_t *amd, uint32_t ms)
+void samd_set_wait_for_voice_ms(samd_t *amd, uint32_t ms)
 {
-	amd->silence_start_ms = ms;
+	amd->wait_for_voice_ms = ms;
 }
 
 /**
@@ -293,7 +293,7 @@ void samd_init(samd_t **amd)
 	new_amd->time_ms = 0;
 
 	/* set detection defaults */
-	samd_set_silence_start_ms(new_amd, 2000); /* wait 2 seconds for start of speech */
+	samd_set_wait_for_voice_ms(new_amd, 2000); /* wait 2 seconds for start of speech */
 	samd_set_machine_ms(new_amd, 1100); /* machine if at least 1100 ms of voice */
 
 	*amd = new_amd;

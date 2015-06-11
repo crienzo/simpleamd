@@ -12,11 +12,11 @@ static void vad_state_silence(samd_vad_t *vad, int in_voice);
 static void vad_state_voice(samd_vad_t *vad, int in_voice);
 
 #define VAD_DEFAULT_ENERGY_THRESHOLD 130.0
+#define VAD_DEFAULT_MAX_ENERGY_THRESHOLD 1300.0
 #define VAD_DEFAULT_VOICE_MS 60
-#define VAD_DEFAULT_SILENCE_MS 850
+#define VAD_DEFAULT_VOICE_END_MS 850
 #define VAD_DEFAULT_INITIAL_ADJUST_MS 200
 #define VAD_DEFAULT_VOICE_ADJUST_MS 0
-#define VAD_DEFAULT_THRESHOLD_ADJUST_LIMIT 10
 
 /**
  * NO-OP log handler
@@ -77,13 +77,13 @@ void samd_vad_set_voice_ms(samd_vad_t *vad, uint32_t ms)
 }
 
 /**
- * Set the duration of silence in ms a transition to silence state
+ * Set the duration of silence in ms to transition to silence state
  * @param vad
  * @param ms
  */
-void samd_vad_set_silence_ms(samd_vad_t *vad, uint32_t ms)
+void samd_vad_set_voice_end_ms(samd_vad_t *vad, uint32_t ms)
 {
-	vad->silence_ms = ms;
+	vad->voice_end_ms = ms;
 }
 
 /**
@@ -113,11 +113,11 @@ void samd_vad_set_voice_adjust_ms(samd_vad_t *vad, uint32_t ms)
 }
 
 /**
- * Maximum adjust factor relative to current threshold.
+ * Maximum energy threshold allowed
  */
-void samd_vad_set_adjust_limit(samd_vad_t *vad, uint32_t limit)
+void samd_vad_set_max_energy_threshold(samd_vad_t *vad, double max_energy_threshold)
 {
-	vad->threshold_adjust_limit = limit;
+	vad->max_threshold = max_energy_threshold;
 }
 
 /**
@@ -127,7 +127,7 @@ static void vad_threshold_adjust(samd_vad_t *vad, samd_frame_analyzer_t *analyze
 {
 	uint32_t time_ms = vad->time_ms;
 	double average_energy = samd_frame_analyzer_get_average_energy(analyzer);
-	double new_threshold = fmin(average_energy * 3.0, vad->threshold * vad->threshold_adjust_limit);
+	double new_threshold = fmin(average_energy * 3.0, vad->max_threshold);
 	if (new_threshold > vad->threshold) {
 		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: increasing threshold %f to %f, average energy = %f\n", time_ms, vad->threshold, new_threshold, average_energy);
 		vad->threshold = new_threshold;
@@ -153,8 +153,8 @@ void samd_vad_process_frame(samd_frame_analyzer_t *analyzer, void *user_data, ui
 		vad_threshold_adjust(vad, analyzer);
 	}
 
-	/* use really high energy threshold if sensing background noise levels has not completed */
-	if ((vad->time_ms > vad->initial_adjust_ms && energy > vad->threshold) || energy > vad->threshold * vad->threshold_adjust_limit) {
+	/* use max energy threshold if sensing of background noise levels has not completed */
+	if ((vad->time_ms > vad->initial_adjust_ms && energy > vad->threshold) || energy > vad->max_threshold) {
 		vad->total_voice_ms += MS_PER_FRAME;
 		vad->state(vad, 1);
 	} else {
@@ -198,11 +198,11 @@ void samd_vad_init_internal(samd_vad_t **vad)
 
 	/* set detection defaults */
 	samd_vad_set_energy_threshold(new_vad, VAD_DEFAULT_ENERGY_THRESHOLD);
-	samd_vad_set_voice_ms(new_vad, VAD_DEFAULT_VOICE_MS);
-	samd_vad_set_silence_ms(new_vad, VAD_DEFAULT_SILENCE_MS);
+	samd_vad_set_max_energy_threshold(new_vad, VAD_DEFAULT_MAX_ENERGY_THRESHOLD);
 	samd_vad_set_initial_adjust_ms(new_vad, VAD_DEFAULT_INITIAL_ADJUST_MS);
 	samd_vad_set_voice_adjust_ms(new_vad, VAD_DEFAULT_VOICE_ADJUST_MS);
-	samd_vad_set_adjust_limit(new_vad, VAD_DEFAULT_THRESHOLD_ADJUST_LIMIT);
+	samd_vad_set_voice_ms(new_vad, VAD_DEFAULT_VOICE_MS);
+	samd_vad_set_voice_end_ms(new_vad, VAD_DEFAULT_VOICE_END_MS);
 
 	*vad = new_vad;
 }
@@ -264,7 +264,7 @@ static void vad_state_voice(samd_vad_t *vad, int in_voice)
 		vad->transition_ms += MS_PER_FRAME;
 	}
 
-	if (vad->transition_ms >= vad->silence_ms) {
+	if (vad->transition_ms >= vad->voice_end_ms) {
 		vad->state = vad_state_silence;
 		vad->transition_ms = 0;
 		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (voice) SILENCE DETECTED, total voice ms = %d\n", vad->time_ms, vad->total_voice_ms);
