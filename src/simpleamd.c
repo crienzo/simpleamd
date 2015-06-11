@@ -14,15 +14,15 @@
 int debug = 0;
 int summarize = 0;
 int amd_silence_ms = 2000;
-int amd_machine_ms = 1100;
+int amd_machine_ms = 1300;
 double vad_energy_threshold = 130.0;
-int vad_voice_ms = 20;
-int vad_silence_ms = 500;
+int vad_voice_ms = 60;
+int vad_silence_ms = 850;
 int vad_sample_rate = 8000;
 int vad_channels = 1;
-int vad_initial_adjust_ms = 100;
+int vad_initial_adjust_ms = 200;
 int vad_voice_adjust_ms = 0;
-int vad_adjust_limit = 3;
+int vad_adjust_limit = 10;
 
 static const char *result_string[4] = { "unknown", "human", "machine", "no-voice" };
 enum amd_test_result {
@@ -77,6 +77,7 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 	FILE *raw_audio_file;
 	int16_t samples[80] = { 0 };
 	enum amd_test_result result = RESULT_UNKNOWN;
+	int pass = 0;
 
 	/* create AMD */
 	samd_init(&amd);
@@ -123,6 +124,7 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 			case RESULT_UNKNOWN: test_stats->machines_detected_as_unknown++; break;
 			case RESULT_HUMAN: test_stats->machines_detected_as_human++; break;
 			case RESULT_NO_VOICE: test_stats->machines_detected_as_no_voice++; break;
+			case RESULT_MACHINE: pass = 1; break;
 			default: break;
 		}
 	} else if (expected_result == RESULT_HUMAN) {
@@ -130,12 +132,13 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 		switch (result) {
 			case RESULT_UNKNOWN: test_stats->humans_detected_as_unknown++; break;
 			case RESULT_MACHINE: test_stats->humans_detected_as_machine++; break;
-			case RESULT_NO_VOICE: test_stats->humans_detected_as_no_voice++; break;
+			case RESULT_NO_VOICE: pass = 1; test_stats->humans_detected_as_no_voice++; break;
+			case RESULT_HUMAN: pass = 1; break;
 			default: break;
 		}
 	}
 
-	printf("%s,%s\n", raw_audio_file_name, result_string[result]);
+	printf("%s,%s,%s\n", raw_audio_file_name, result_string[result], pass ? "pass" : "fail");
 
 	return result;
 }
@@ -150,7 +153,7 @@ static enum amd_test_result analyze_file(struct amd_test_stats *test_stats, cons
 	"\t-i <vad initial adjust ms> Time to measure background environment before starting VAD.  Disable with 0. (default 100)\n" \
 	"\t-r <vad sample rate> Sample rate of input audio (default 8000)\n" \
 	"\t-c <vad channels> Number of channels per sample (default 1)\n" \
-	"\t-n <vad voice adjust ms> Time relative to start of initial utterance for voice adjustment.  Disable with 0. (default 50)\n" \
+	"\t-n <vad voice adjust ms> Time relative to start of initial utterance for voice adjustment.  Disable with 0. (default 0)\n" \
 	"\t-a <vad adjust threshold> maximum factor to adjust energy threshold relative to current threshold.  (default 3)\n" \
 	"\t-m <amd machine ms> Voice longer than this time is classified as machine (default 1100)\n" \
 	"\t-w <amd wait for voice ms> How long to wait for voice to begin (default 2000)\n" \
