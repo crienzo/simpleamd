@@ -21,7 +21,7 @@ int vad_silence_ms = 500;
 int vad_sample_rate = 8000;
 int vad_channels = 1;
 int vad_initial_adjust_ms = 100;
-int vad_voice_adjust_ms = 50;
+int vad_voice_adjust_ms = 0;
 int vad_adjust_limit = 3;
 
 static const char *result_string[4] = { "unknown", "human", "machine", "no-voice" };

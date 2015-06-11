@@ -15,7 +15,7 @@ static void vad_state_voice(samd_vad_t *vad, int in_voice);
 #define VAD_DEFAULT_VOICE_MS 20
 #define VAD_DEFAULT_SILENCE_MS 500
 #define VAD_DEFAULT_INITIAL_ADJUST_MS 100
-#define VAD_DEFAULT_VOICE_ADJUST_MS 50
+#define VAD_DEFAULT_VOICE_ADJUST_MS 0
 #define VAD_DEFAULT_THRESHOLD_ADJUST_LIMIT 3
 
 /**
