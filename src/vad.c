@@ -8,6 +8,7 @@
 #include <math.h>
 #include "samd_private.h"
 
+static void vad_state_initial(samd_vad_t *vad, int in_voice);
 static void vad_state_silence(samd_vad_t *vad, int in_voice);
 static void vad_state_voice(samd_vad_t *vad, int in_voice);
 
@@ -191,7 +192,7 @@ void samd_vad_init_internal(samd_vad_t **vad)
 
 	/* reset detection state */
 	new_vad->time_ms = 0;
-	new_vad->state = vad_state_silence;
+	new_vad->state = vad_state_initial;
 	new_vad->transition_ms = 0;
 	new_vad->initial_voice_time_ms = 0;
 	new_vad->total_voice_ms = 0;
@@ -226,11 +227,11 @@ void samd_vad_init(samd_vad_t **vad)
 }
 
 /**
- * Process internal events in the silence state
+ * Common code for the initial and silence states
  * @param vad
  * @param in_voice true if a voice frame was measured
  */
-static void vad_state_silence(samd_vad_t *vad, int in_voice)
+static void vad_state_common(samd_vad_t *vad, int in_voice)
 {
 	if (in_voice) {
 		vad->transition_ms += MS_PER_FRAME;
@@ -245,7 +246,35 @@ static void vad_state_silence(samd_vad_t *vad, int in_voice)
 			vad->initial_voice_time_ms = vad->time_ms;
 		}
 		vad->event_handler(SAMD_VAD_VOICE_BEGIN, vad->time_ms, vad->total_voice_ms, 0, vad->user_event_data);
+	}
+}
+
+/**
+ * Process internal events in the initial state
+ * @param vad
+ * @param in_voice true if a voice frame was measured
+ */
+static void vad_state_initial(samd_vad_t *vad, int in_voice)
+{
+	vad_state_common(vad, in_voice);
+	if (vad->state != vad_state_voice && vad->time_ms >= vad->voice_end_ms) {
+		vad->state = vad_state_silence;
+		samd_log_printf(vad, SAMD_LOG_INFO, "%d: (voice) SILENCE DETECTED, total voice ms = %d\n", vad->time_ms, vad->total_voice_ms);
+		vad->event_handler(SAMD_VAD_SILENCE_BEGIN, vad->time_ms, vad->total_voice_ms, 0, vad->user_event_data);
 	} else {
+		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) energy = %f, voice ms = %d, zero crossings = %d, total voice ms = %d\n", vad->time_ms, vad->energy, vad->transition_ms, vad->zero_crossings, vad->total_voice_ms);
+	}
+}
+
+/**
+ * Process internal events in the silence state
+ * @param vad
+ * @param in_voice true if a voice frame was measured
+ */
+static void vad_state_silence(samd_vad_t *vad, int in_voice)
+{
+	vad_state_common(vad, in_voice);
+	if (vad->state != vad_state_voice) {
 		samd_log_printf(vad, SAMD_LOG_DEBUG, "%d: (silence) energy = %f, voice ms = %d, zero crossings = %d, total voice ms = %d\n", vad->time_ms, vad->energy, vad->transition_ms, vad->zero_crossings, vad->total_voice_ms);
 		vad->event_handler(SAMD_VAD_SILENCE, vad->time_ms, vad->total_voice_ms, vad->transition_ms, vad->user_event_data);
 	}
