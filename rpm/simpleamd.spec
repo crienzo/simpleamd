@@ -1,6 +1,6 @@
 Summary: A library for answering machine detection
 Name: simpleamd
-Version: 1.0.0
+Version: 1.1.0
 Release: 1%{?dist}
 License: MIT
 Group: System Environment/Libraries
@@ -46,5 +46,7 @@ rm -f $RPM_BUILD_ROOT%{_libdir}/*.la
 %{_libdir}/libsimpleamd*.so
 
 %changelog
+* Thu Apr 27 2017 James Le Cuirot <james.le-cuirot@yakara.com> 1.1.0-1
+- Start vad in initial state so that SILENCE event can be emitted first
 * Mon Jun 8 2015 Chris Rienzo <chris@rienzo.com> 1.0.0-1
 - Initial revision
