@@ -1,9 +1,5 @@
-#!/bin/bash
+#!/bin/sh -e
 
-if [ -z "$RPMBUILD_DIR" ]; then
-  RPMBUILD_DIR=$HOME/rpmbuild
-fi
-
-rpmbuild --define "_topdir $RPMBUILD_DIR" \
-	-ba $RPMBUILD_DIR/SPECS/simpleamd.spec
-
+: ${RPMBUILD_DIR:=$HOME/rpmbuild}
+exec rpmbuild --define "_topdir $RPMBUILD_DIR" \
+	-ba "$RPMBUILD_DIR"/SPECS/simpleamd.spec
