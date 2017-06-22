@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([simpleamd], [1.0.0], [https://github.com/crienzo/simpleamd/issues])
+AC_INIT([simpleamd], [1.1.0], [https://github.com/crienzo/simpleamd/issues])
 AM_INIT_AUTOMAKE
 AC_CONFIG_HEADERS([config.h])
 

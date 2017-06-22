@@ -1,17 +1,9 @@
-#!/bin/sh
+#!/bin/sh -e
 
-VERSION=1.0.0
-SIMPLEAMD_DIR=`pwd`
+SIMPLEAMD_DIR=${0%/*}/..
+VERSION=$(sed -r -n "s/^Version: (.*)/\1/p" "$SIMPLEAMD_DIR"/rpm/simpleamd.spec)
+: ${RPMBUILD_DIR:=$HOME/rpmbuild}
 
-if [ -z "$RPMBUILD_DIR" ]; then
-  RPMBUILD_DIR=$HOME/rpmbuild
-fi
-
-mkdir -p $RPMBUILD_DIR
-pushd $RPMBUILD_DIR
-(mkdir -p SOURCES BUILD BUILDROOT RPMS SRPMS SPECS)
-popd
-
-tar czf $RPMBUILD_DIR/SOURCES/simpleamd-$VERSION.tar.gz -C $SIMPLEAMD_DIR .
-cp rpm/simpleamd.spec $RPMBUILD_DIR/SPECS
-
+mkdir -p "$RPMBUILD_DIR"/{SOURCES,BUILD,BUILDROOT,RPMS,SRPMS,SPECS}
+tar czf "$RPMBUILD_DIR/SOURCES/simpleamd-$VERSION.tar.gz" -C "$SIMPLEAMD_DIR" .
+cp "$SIMPLEAMD_DIR"/rpm/simpleamd.spec "$RPMBUILD_DIR"/SPECS
